@@ -1,0 +1,23 @@
+# Environments
+.env
+.venv
+env/
+venv/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# IDEs
+.vscode/
+.idea/
+
+# Distribution
+dist/
+build/
+*.egg-info/
