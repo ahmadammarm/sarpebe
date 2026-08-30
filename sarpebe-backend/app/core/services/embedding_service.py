@@ -8,6 +8,8 @@ from app.utils.cost_calculator import calculate_cost
 
 client = genai.Client(api_key=settings.gemini_api_key)
 
+from google.genai import types
+
 class EmbeddingService:
     @staticmethod
     @retry(
@@ -23,7 +25,9 @@ class EmbeddingService:
         response = await client.aio.models.embed_content(
             model=settings.gemini_embedding_model,
             contents=text,
+            config=types.EmbedContentConfig(output_dimensionality=768)
         )
+
         
         embedding = response.embeddings[0].values
         

@@ -60,12 +60,36 @@ class LLMService:
         {context_text}
         """
 
+        # Define schema manually to avoid Pydantic additionalProperties bug in Gemini SDK
+        lesson_plan_schema = {
+            "type": "OBJECT",
+            "properties": {
+                "title": {"type": "STRING", "description": "Title of the lesson plan"},
+                "objectives": {"type": "ARRAY", "items": {"type": "STRING"}, "description": "Learning objectives"},
+                "materials": {"type": "ARRAY", "items": {"type": "STRING"}, "description": "Required materials"},
+                "activities": {
+                    "type": "ARRAY",
+                    "items": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "duration": {"type": "STRING"},
+                            "description": {"type": "STRING"}
+                        }
+                    },
+                    "description": "List of activities"
+                },
+                "assessment": {"type": "STRING", "description": "How to assess learning"},
+                "citations": {"type": "ARRAY", "items": {"type": "STRING"}, "description": "Exact source document names"}
+            },
+            "required": ["title", "objectives", "materials", "activities", "assessment", "citations"]
+        }
+
         response = await client.aio.models.generate_content(
             model=settings.gemini_generation_model,
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
-                response_schema=LessonPlanSchema,
+                response_schema=lesson_plan_schema,
                 temperature=0.2,
             )
         )

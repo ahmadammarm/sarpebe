@@ -6,6 +6,10 @@ PRICING = {
         "input": Decimal("0.000075"),
         "output": Decimal("0.0003")
     },
+    "gemini-3.5-flash-lite": {
+        "input": Decimal("0.000075"),
+        "output": Decimal("0.0003")
+    },
     "gemini-embedding-2": {
         "input": Decimal("0.00001"),
         "output": Decimal("0.0")
