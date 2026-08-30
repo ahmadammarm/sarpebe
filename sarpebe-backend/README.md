@@ -33,12 +33,11 @@ sarpebe-backend/
 │   ├── config.py                   # Centralized settings via pydantic-settings (reads .env)
 │   ├── api/
 │   │   ├── deps.py                 # Shared FastAPI Depends(): get_db, get_current_user
-│   │   └── v1/
-│   │       ├── router.py           # V1 router aggregation
-│   │       └── routers/            # HTTP endpoint definitions
-│   │           ├── users.py        # /users — profile management
-│   │           ├── lesson_plans.py # /lesson-plans — CRUD + generation trigger
-│   │           └── curriculum.py   # /curriculum — document upload and management
+│   │   ├── router.py               # Router aggregation
+│   │   └── routers/                # HTTP endpoint definitions
+│   │       ├── users.py            # /users — profile management
+│   │       ├── lesson_plans.py     # /lesson-plans — CRUD + generation trigger
+│   │       └── curriculum.py       # /curriculum — document upload and management
 │   ├── core/
 │   │   ├── security.py             # JWT validation, Supabase token verification
 │   │   ├── exceptions.py           # App-wide custom exception classes
@@ -83,7 +82,7 @@ sarpebe-backend/
 ## Layered Architecture
 
 ```
-Router (api/v1/routers/)
+Router (api/routers/)
   |
   | calls
   v
@@ -196,14 +195,14 @@ celery -A app.tasks.celery_app worker --loglevel=info
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/api/v1/auth/login` | Authenticate and receive JWT |
-| `GET` | `/api/v1/users/me` | Get current user profile |
-| `GET` | `/api/v1/lesson-plans` | List lesson plans (paginated) |
-| `POST` | `/api/v1/lesson-plans` | Trigger async lesson plan generation |
-| `GET` | `/api/v1/lesson-plans/{id}` | Get a single lesson plan |
-| `GET` | `/api/v1/lesson-plans/jobs/{job_id}` | Poll background job status |
-| `POST` | `/api/v1/curriculum/upload` | Upload a curriculum document (PDF) |
-| `GET` | `/api/v1/curriculum` | List uploaded curriculum documents |
+| `POST` | `/api/auth/login` | Authenticate and receive JWT |
+| `GET` | `/api/users/me` | Get current user profile |
+| `GET` | `/api/lesson-plans` | List lesson plans (paginated) |
+| `POST` | `/api/lesson-plans` | Trigger async lesson plan generation |
+| `GET` | `/api/lesson-plans/{id}` | Get a single lesson plan |
+| `GET` | `/api/lesson-plans/jobs/{job_id}` | Poll background job status |
+| `POST` | `/api/curriculum/upload` | Upload a curriculum document (PDF) |
+| `GET` | `/api/curriculum` | List uploaded curriculum documents |
 
 ---
 
