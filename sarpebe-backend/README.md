@@ -31,54 +31,40 @@ sarpebe-backend/
 ├── app/
 │   ├── main.py                     # App entrypoint: registers routers, middleware, lifespan
 │   ├── config.py                   # Centralized settings via pydantic-settings (reads .env)
-│   │
 │   ├── api/
 │   │   ├── deps.py                 # Shared FastAPI Depends(): get_db, get_current_user
 │   │   └── v1/
-│   │       └── routers/
-│   │           ├── auth.py         # /auth — login, register, token refresh
+│   │       ├── router.py           # V1 router aggregation
+│   │       └── routers/            # HTTP endpoint definitions
+│   │           ├── users.py        # /users — profile management
 │   │           ├── lesson_plans.py # /lesson-plans — CRUD + generation trigger
-│   │           ├── curriculum.py   # /curriculum — document upload and management
-│   │           └── users.py        # /users — profile management
-│   │
+│   │           └── curriculum.py   # /curriculum — document upload and management
 │   ├── core/
 │   │   ├── security.py             # JWT validation, Supabase token verification
 │   │   ├── exceptions.py           # App-wide custom exception classes
 │   │   └── services/               # Business logic layer (no SQL, no HTTP here)
-│   │       ├── lesson_plan_service.py  # Coordinates RAG + generation flow
-│   │       ├── rag_service.py          # Retrieval: pre-filter + vector search
 │   │       ├── embedding_service.py    # Generates Gemini text embeddings
-│   │       └── llm_service.py          # Gemini API calls, token counting, cost calculation
-│   │
+│   │       ├── rag_service.py          # Retrieval: pre-filter + vector search
+│   │       ├── llm_service.py          # Gemini API calls, token counting, cost calculation
+│   │       └── lesson_plan_service.py  # Coordinates RAG + generation flow
 │   ├── db/
 │   │   ├── session.py              # AsyncEngine + AsyncSession factory
-│   │   ├── base.py                 # SQLAlchemy declarative base
-│   │   ├── models/                 # ORM table definitions
-│   │   │   ├── profile.py
-│   │   │   ├── lesson_plan.py
-│   │   │   ├── curriculum_document.py
-│   │   │   ├── document_chunk.py
-│   │   │   └── llm_cost_log.py
 │   │   └── repositories/           # Pure DB access (CRUD + pgvector queries)
 │   │       ├── base_repository.py      # Generic CRUD — shared by all repositories (DRY)
+│   │       ├── user_repository.py
 │   │       ├── lesson_plan_repository.py
-│   │       ├── document_chunk_repository.py
-│   │       └── user_repository.py
-│   │
+│   │       └── document_chunk_repository.py
 │   ├── schemas/                    # Pydantic V2 I/O models
 │   │   ├── common.py               # Shared types: pagination, base API response
+│   │   ├── user.py
 │   │   ├── lesson_plan.py
-│   │   ├── curriculum.py
-│   │   └── user.py
-│   │
+│   │   └── curriculum.py
 │   ├── tasks/                      # Celery async task definitions
 │   │   ├── celery_app.py           # Celery app factory and configuration
 │   │   └── generation_tasks.py     # Async lesson plan generation task
-│   │
 │   └── utils/                      # Pure utility functions (no business logic)
 │       ├── chunking.py             # Semantic text chunking by logical boundaries
 │       └── cost_calculator.py      # Token-to-fiat cost formula
-│
 ├── alembic/                        # Alembic migration environment
 │   └── versions/                   # Auto-generated migration scripts
 ├── tests/
