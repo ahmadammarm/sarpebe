@@ -6,7 +6,7 @@ This file provides AI coding agents with all necessary context, architectural ru
 
 ## Project Context
 
-You are working on the frontend of SARPEBE, an Educational SaaS. The frontend is a Next.js 16 application that serves as the primary interface for Indonesian educators to generate curriculum-aligned lesson plans, manage their history, and upload curriculum documents.
+You are working on the frontend of SARPEBE, an educational platform. The frontend is a Next.js 16 application that serves as the primary interface for Indonesian educators to generate curriculum-aligned lesson plans, manage their history, and upload curriculum documents.
 
 The frontend communicates exclusively with the SARPEBE backend via REST API. It has no direct database access.
 

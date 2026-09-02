@@ -1,7 +1,7 @@
 # SARPEBE
 **Sistem Automasi Rencana Pembelajaran Berbasis Kurikulum**
 
-SARPEBE is an Educational SaaS platform that automates the generation of curriculum-aligned lesson plans for Indonesian educators. It leverages Retrieval-Augmented Generation (RAG) powered by Google Gemini to produce structured lesson plans grounded strictly in official curriculum documents (Capaian Pembelajaran, ATP, and Buku Guru), with zero hallucinations.
+SARPEBE is an educational platform that automates the generation of curriculum-aligned lesson plans for Indonesian educators. It leverages Retrieval-Augmented Generation (RAG) powered by Google Gemini to produce structured lesson plans grounded strictly in official curriculum documents (Capaian Pembelajaran, ATP, and Buku Guru), with zero hallucinations.
 
 ---
 
@@ -76,7 +76,7 @@ Lesson plans are generated using RAG. The system retrieves the most semantically
 AI generation can take 10–30 seconds. The API immediately returns `202 Accepted` with a `job_id`. A Celery worker handles the generation in the background. The frontend polls the job status endpoint until the plan is ready.
 
 **Cost Observability**
-Every call to the Gemini API records `prompt_tokens`, `completion_tokens`, and the calculated fiat cost to the database, enabling SaaS billing and usage analytics.
+Every call to the Gemini API records `prompt_tokens`, `completion_tokens`, and the calculated fiat cost to the database, enabling usage and cost analytics.
 
 **Multi-Tenant Security**
 Supabase Row Level Security (RLS) ensures users can only access their own data. UUIDs are used as primary keys to prevent ID enumeration attacks.

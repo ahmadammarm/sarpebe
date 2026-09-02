@@ -6,7 +6,7 @@ This file provides AI coding agents with all necessary context, architectural ru
 
 ## Project Context
 
-You are working on the backend of SARPEBE, an Educational SaaS. The backend is a Python/FastAPI REST API whose primary responsibility is to automate the generation of curriculum-aligned lesson plans using Retrieval-Augmented Generation (RAG).
+You are working on the backend of SARPEBE, an educational platform. The backend is a Python/FastAPI REST API whose primary responsibility is to automate the generation of curriculum-aligned lesson plans using Retrieval-Augmented Generation (RAG).
 
 The core constraint is: all generated content must be strictly grounded in official curriculum documents uploaded by administrators. Zero hallucinations. Every lesson plan must be traceable to a source document.
 

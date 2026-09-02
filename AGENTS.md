@@ -6,7 +6,7 @@ This file provides AI coding agents with context, rules, and conventions for wor
 
 ## Project Overview
 
-SARPEBE (Sistem Automasi Rencana Pembelajaran Berbasis Kurikulum) is an Educational SaaS that automates curriculum-aligned lesson plan generation for Indonesian educators. It uses Retrieval-Augmented Generation (RAG) powered by Google Gemini, grounded strictly on official curriculum documents.
+SARPEBE (Sistem Automasi Rencana Pembelajaran Berbasis Kurikulum) is an educational platform that automates curriculum-aligned lesson plan generation for Indonesian educators. It uses Retrieval-Augmented Generation (RAG) powered by Google Gemini, grounded strictly on official curriculum documents.
 
 ---
 

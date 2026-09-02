@@ -112,7 +112,7 @@ erDiagram
 - `created_at` (TIMESTAMP): Request timestamp.
 
 ### 5. `llm_cost_logs`
-**Purpose:** SaaS analytics and token cost tracking.
+**Purpose:** Usage analytics and token cost tracking.
 
 **Columns:**
 - `id` (UUID, PK): Unique log identifier.
@@ -149,7 +149,7 @@ Since the database is hosted on Supabase, we enforce security at the database la
 
 ### 3. UUIDs over Sequential IDs
 - **Decision:** Using UUIDs as Primary Keys across all tables.
-- **Pro:** Prevents ID enumeration attacks (essential for multi-tenant SaaS security).
+- **Pro:** Prevents ID enumeration attacks (essential for multi-user security).
 - **Con:** UUIDs consume more storage (16 bytes vs 4 bytes) and can lead to slight index fragmentation over time.
 
 ## Querying Rules & Best Practices (SQLAlchemy)
@@ -167,7 +167,7 @@ To ensure system stability, prevent race conditions, and maintain high performan
 - **Implementation:** Use SQLAlchemy's transaction context managers (e.g., `async with session.begin():`). If any step raises an exception, the database will automatically execute a `ROLLBACK`. Only upon successful completion of the block will it `COMMIT`.
 
 ### 3. Concurrency and Row-Level Locking (Pessimistic Locking)
-- **Context:** In a SaaS environment, a user might double-click a "Generate" button. If they only have 1 generation quota left, a race condition could allow both requests to read "1 remaining" simultaneously, bypassing the limit.
+- **Context:** In a multi-user environment, a user might double-click a "Generate" button. If they only have 1 generation quota left, a race condition could allow both requests to read "1 remaining" simultaneously, bypassing the limit.
 - **Rule:** When reading and modifying state subject to concurrent limits (like user quotas, token balances, or subscription state), you must lock the row.
 - **Implementation:** Use `SELECT ... FOR UPDATE` (via SQLAlchemy's `with_for_update()` method) when fetching the profile/quota record. This places a row-level lock in PostgreSQL, forcing any concurrent transaction attempting to read that same row for an update to wait until the first transaction completes.
 

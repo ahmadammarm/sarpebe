@@ -1,7 +1,7 @@
 # SARPEBE Backend
 **FastAPI REST API**
 
-The backend for SARPEBE is a high-performance, asynchronous REST API that handles all business logic, RAG orchestration, AI generation, and database operations. It is designed for a multi-tenant SaaS environment with strict security, cost observability, and non-blocking AI processing.
+The backend for SARPEBE is a high-performance, asynchronous REST API that handles all business logic, RAG orchestration, AI generation, and database operations. It is designed for a multi-user environment with strict security, cost observability, and non-blocking AI processing.
 
 ---
 
