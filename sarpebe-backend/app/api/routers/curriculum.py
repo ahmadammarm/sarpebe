@@ -35,9 +35,9 @@ async def upload_document(
             file_options={"content-type": "application/pdf"}
         )
 
-        # Get public URL
-        url_response = supabase_client.storage.from_("sarpebe-storage").get_public_url(storage_path)
-        url_path = url_response if isinstance(url_response, str) else url_response.get("publicURL", storage_path)
+        # Construct public URL manually to ensure it's never empty
+        from app.config import settings
+        url_path = f"{settings.supabase_url}/storage/v1/object/public/sarpebe-storage/{storage_path}"
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload to storage: {str(e)}")
 
