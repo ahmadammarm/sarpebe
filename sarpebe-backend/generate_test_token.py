@@ -24,7 +24,8 @@ async def main():
         user = Profile(
             id=test_user_id,
             full_name="Test Educator",
-            subscription_tier="premium"
+            subscription_tier="premium",
+            role="admin"
         )
         db.add(user)
         await db.commit()
