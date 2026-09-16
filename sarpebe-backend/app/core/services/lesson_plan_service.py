@@ -27,9 +27,12 @@ class LessonPlanService:
             "status": "pending"
         })
         
-        # Dispatch background generation task (task defined in Phase 6)
-        from app.tasks.generation_tasks import generate_lesson_plan_task
-        job = generate_lesson_plan_task.delay(str(plan.id), str(user_id))
+        # Dispatch background generation task
+        from app.tasks.celery_app import celery_app
+        job = celery_app.send_task(
+            "tasks.generate_lesson_plan",
+            args=[str(plan.id), str(user_id)]
+        )
 
         return job.id
 
