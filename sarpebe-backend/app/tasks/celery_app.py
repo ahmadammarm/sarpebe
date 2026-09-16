@@ -11,7 +11,7 @@ celery_app = Celery(
     "sarpebe_tasks",
     broker=broker_url,
     backend=broker_url,
-    include=["app.tasks.generation_tasks"]
+    include=["app.tasks.generation_tasks", "app.tasks.curriculum_tasks"]
 )
 
 celery_app.conf.update(

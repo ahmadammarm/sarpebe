@@ -12,6 +12,7 @@ class CurriculumDocument(Base):
     title: Mapped[str] = mapped_column(String, nullable=False)
     document_type: Mapped[str] = mapped_column(String, nullable=False) # 'CP', 'ATP', 'Buku Guru'
     url_path: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, default="processing")
     uploaded_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
 
     # Relationships

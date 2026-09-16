@@ -7,6 +7,7 @@ class CurriculumDocumentResponse(BaseModel):
     title: str
     document_type: str
     url_path: str
+    status: str
     uploaded_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

@@ -12,6 +12,7 @@ def mock_user():
         id=uuid.uuid4(),
         full_name="Test User",
         subscription_tier="free",
+        role="user",
         created_at=datetime.now(timezone.utc)
     )
 

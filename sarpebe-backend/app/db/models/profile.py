@@ -12,6 +12,7 @@ class Profile(Base):
     full_name: Mapped[str] = mapped_column(String, nullable=False)
     school_name: Mapped[str | None] = mapped_column(String, nullable=True)
     subscription_tier: Mapped[str] = mapped_column(String, default="free")
+    role: Mapped[str] = mapped_column(String, default="user", nullable=False)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
 
     # Relationships
