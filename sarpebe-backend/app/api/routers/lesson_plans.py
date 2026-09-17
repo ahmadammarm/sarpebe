@@ -1,5 +1,8 @@
 import uuid
+import json
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_db, get_current_user
 from app.schemas.lesson_plan import LessonPlanCreate, LessonPlanUpdate, LessonPlanResponse, JobStatusResponse
@@ -112,11 +115,45 @@ async def export_lesson_plan_pdf(
 async def get_job_status(job_id: str):
     from app.tasks.celery_app import celery_app
     from celery.result import AsyncResult
-    
+
     result = AsyncResult(job_id, app=celery_app)
-    
+
     state = result.state.lower()
     if state == "success":
         state = "completed"
-        
+
     return JobStatusResponse(job_id=job_id, status=state)
+
+@router.get("/jobs/{job_id}/stream")
+async def stream_job_status(job_id: str):
+    """
+    Server-Sent Events (SSE) endpoint to stream generation task progress in real time.
+    """
+    from app.tasks.celery_app import celery_app
+    from celery.result import AsyncResult
+
+    async def event_generator():
+        result = AsyncResult(job_id, app=celery_app)
+        while True:
+            state = result.state.lower()
+            if state == "success":
+                state = "completed"
+
+            payload = {"job_id": job_id, "status": state}
+            yield f"data: {json.dumps(payload)}\n\n"
+
+            if state in ["completed", "failed", "revoked"]:
+                break
+
+            await asyncio.sleep(1)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
