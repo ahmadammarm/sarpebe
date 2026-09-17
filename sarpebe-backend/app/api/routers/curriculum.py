@@ -60,11 +60,28 @@ async def upload_document(
 @router.get("", response_model=list[CurriculumDocumentResponse])
 async def list_documents(
     db: AsyncSession = Depends(get_db),
-    # List is available to all authenticated users, so they can see what curriculum is loaded
-    # Or this could be admin only depending on exact requirements.
-    # Current codebase allows any authed user via `get_current_user`.
-    # Let's keep it restricted to admins since uploading is admin only, but standard users might not need to see it.
     current_admin: Profile = Depends(require_admin)
 ):
     result = await db.execute(select(CurriculumDocument))
     return list(result.scalars().all())
+
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_document(
+    id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_admin: Profile = Depends(require_admin)
+):
+    doc = await db.get(CurriculumDocument, id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Curriculum document not found")
+
+    # Try removing the file from Supabase storage
+    try:
+        storage_path = f"curriculum/{doc.id}.pdf"
+        supabase_client.storage.from_("sarpebe-storage").remove([storage_path])
+    except Exception:
+        pass  # Proceed with DB deletion even if storage remove fails or file is missing
+
+    await db.delete(doc)
+    await db.commit()
+    return None

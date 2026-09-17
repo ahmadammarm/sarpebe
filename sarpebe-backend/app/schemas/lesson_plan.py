@@ -8,6 +8,9 @@ class LessonPlanCreate(BaseModel):
     subject: str
     topic: str
 
+class LessonPlanUpdate(BaseModel):
+    generated_content: dict[str, Any]
+
 class LessonPlanResponse(BaseModel):
     id: UUID
     grade_level: str

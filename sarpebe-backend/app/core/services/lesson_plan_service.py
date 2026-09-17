@@ -10,15 +10,8 @@ class LessonPlanService:
     @staticmethod
     async def trigger_generation(db: AsyncSession, user_id: uuid.UUID, payload: LessonPlanCreate) -> str:
         """
-        Validates quota using row-level locking, creates a pending plan, and dispatches to Celery.
+        Creates a pending plan and dispatches to Celery (unlimited/free tier for now).
         """
-        user = await user_repo.get_by_id_for_update(db, str(user_id))
-        
-        # Check quota dynamically by counting existing plans
-        _, count = await lesson_plan_repo.get_multi_by_user(db, user_id, 0, 1)
-        if user.subscription_tier == "free" and count >= settings.free_tier_quota:
-            raise QuotaExceededError(f"Free tier limit of {settings.free_tier_quota} reached.")
-            
         plan = await lesson_plan_repo.create(db, {
             "user_id": user_id,
             "grade_level": payload.grade_level,
@@ -26,13 +19,10 @@ class LessonPlanService:
             "topic": payload.topic,
             "status": "pending"
         })
-        
+
         # Dispatch background generation task
-        from app.tasks.celery_app import celery_app
-        job = celery_app.send_task(
-            "tasks.generate_lesson_plan",
-            args=[str(plan.id), str(user_id)]
-        )
+        from app.tasks.generation_tasks import generate_lesson_plan_task
+        job = generate_lesson_plan_task.delay(str(plan.id), str(user_id))
 
         return job.id
 
