@@ -22,9 +22,9 @@ async def create_lesson_plan(
     current_user: Profile = Depends(get_current_user)
 ):
     try:
-        job_id = await lesson_plan_service.trigger_generation(db, current_user.id, payload)
+        job_id, plan_id = await lesson_plan_service.trigger_generation(db, current_user.id, payload)
         await db.commit()
-        return {"job_id": job_id}
+        return {"job_id": job_id, "id": str(plan_id)}
     except QuotaExceededError as e:
         await db.rollback()
         raise HTTPException(status_code=403, detail=str(e))

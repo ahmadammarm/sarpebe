@@ -8,7 +8,7 @@ from app.config import settings
 
 class LessonPlanService:
     @staticmethod
-    async def trigger_generation(db: AsyncSession, user_id: uuid.UUID, payload: LessonPlanCreate) -> str:
+    async def trigger_generation(db: AsyncSession, user_id: uuid.UUID, payload: LessonPlanCreate) -> tuple[str, uuid.UUID]:
         """
         Creates a pending plan and dispatches to Celery (unlimited/free tier for now).
         """
@@ -24,6 +24,6 @@ class LessonPlanService:
         from app.tasks.generation_tasks import generate_lesson_plan_task
         job = generate_lesson_plan_task.delay(str(plan.id), str(user_id))
 
-        return job.id
+        return job.id, plan.id
 
 lesson_plan_service = LessonPlanService()

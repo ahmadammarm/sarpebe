@@ -4,14 +4,14 @@ from typing import Any
 
 class LessonPlanPDF(FPDF):
     def header(self):
-        self.set_font("Helvetica", "B", 14)
-        self.cell(0, 10, "RENCANA PELAKSANAAN PEMBELAJARAN (RPP) / MODUL AJAR", border=False, align="C", new_x="LMARGIN", new_y="NEXT")
-        self.ln(5)
+        self.set_font("Helvetica", "B", 13)
+        self.cell(self.epw, 8, "RENCANA PELAKSANAAN PEMBELAJARAN (RPP) / MODUL AJAR", border=False, align="C", new_x="LMARGIN", new_y="NEXT")
+        self.ln(4)
 
     def footer(self):
         self.set_y(-15)
         self.set_font("Helvetica", "I", 8)
-        self.cell(0, 10, f"Halaman {self.page_no()}/{{nb}}", align="C")
+        self.cell(self.epw, 10, f"Halaman {self.page_no()}/{{nb}}", align="C")
 
 def generate_lesson_plan_pdf(plan_metadata: dict[str, Any], content: dict[str, Any]) -> bytes:
     pdf = LessonPlanPDF()
@@ -19,32 +19,32 @@ def generate_lesson_plan_pdf(plan_metadata: dict[str, Any], content: dict[str, A
     pdf.add_page()
 
     # Metadata section
-    pdf.set_font("Helvetica", "B", 11)
-    pdf.cell(40, 8, "Mata Pelajaran:", new_x="RIGHT")
-    pdf.set_font("Helvetica", "", 11)
-    pdf.cell(0, 8, str(plan_metadata.get("subject", "-")), new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.cell(35, 7, "Mata Pelajaran:", new_x="RIGHT")
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(pdf.epw - 35, 7, str(plan_metadata.get("subject", "-")), new_x="LMARGIN", new_y="NEXT")
 
-    pdf.set_font("Helvetica", "B", 11)
-    pdf.cell(40, 8, "Fase / Kelas:", new_x="RIGHT")
-    pdf.set_font("Helvetica", "", 11)
-    pdf.cell(0, 8, f"Kelas {plan_metadata.get('grade_level', '-')}", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.cell(35, 7, "Fase / Kelas:", new_x="RIGHT")
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(pdf.epw - 35, 7, f"Kelas {plan_metadata.get('grade_level', '-')}", new_x="LMARGIN", new_y="NEXT")
 
-    pdf.set_font("Helvetica", "B", 11)
-    pdf.cell(40, 8, "Topik / Materi:", new_x="RIGHT")
-    pdf.set_font("Helvetica", "", 11)
-    pdf.cell(0, 8, str(plan_metadata.get("topic", "-")), new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(5)
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.cell(35, 7, "Topik / Materi:", new_x="RIGHT")
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(pdf.epw - 35, 7, str(plan_metadata.get("topic", "-")), new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(4)
 
     # Title
     title = content.get("title") or "Modul Ajar"
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.multi_cell(0, 8, f"Judul: {title}", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.multi_cell(pdf.epw, 7, f"Judul: {title}", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(3)
 
     # Helper function for sections
     def add_section(header: str, items: Any):
         pdf.set_font("Helvetica", "B", 11)
-        pdf.cell(0, 8, header, new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(pdf.epw, 7, header, new_x="LMARGIN", new_y="NEXT")
         pdf.set_font("Helvetica", "", 10)
         if isinstance(items, list):
             for item in items:
@@ -52,11 +52,11 @@ def generate_lesson_plan_pdf(plan_metadata: dict[str, Any], content: dict[str, A
                     duration = item.get("duration", "")
                     desc = item.get("description", "")
                     dur_prefix = f"({duration}) " if duration else ""
-                    pdf.multi_cell(0, 6, f"- {dur_prefix}{desc}")
+                    pdf.multi_cell(pdf.epw, 6, f"- {dur_prefix}{desc}", new_x="LMARGIN", new_y="NEXT")
                 else:
-                    pdf.multi_cell(0, 6, f"- {str(item)}")
+                    pdf.multi_cell(pdf.epw, 6, f"- {str(item)}", new_x="LMARGIN", new_y="NEXT")
         elif isinstance(items, str):
-            pdf.multi_cell(0, 6, items)
+            pdf.multi_cell(pdf.epw, 6, items, new_x="LMARGIN", new_y="NEXT")
         pdf.ln(3)
 
     if content.get("objectives"):
@@ -78,3 +78,4 @@ def generate_lesson_plan_pdf(plan_metadata: dict[str, Any], content: dict[str, A
     buffer = BytesIO()
     pdf.output(buffer)
     return buffer.getvalue()
+

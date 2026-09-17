@@ -28,7 +28,18 @@ async def get_current_user(
 
     user = await user_repo.get(db, user_id)
     if not user:
-        raise HTTPException(status_code=404, detail="User profile not found")
+        # Auto-create profile if missing (e.g. Supabase DB trigger not installed)
+        email = payload.get("email") or "user@sarpebe.com"
+        name = payload.get("user_metadata", {}).get("full_name") or email.split("@")[0]
+        user = await user_repo.create(db, {
+            "id": user_id,
+            "full_name": name,
+            "school_name": None,
+            "role": "user",
+            "subscription_tier": "free"
+        })
+        await db.commit()
+        await db.refresh(user)
 
     return user
 

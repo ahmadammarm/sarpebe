@@ -5,7 +5,7 @@ export interface LessonPlan {
   grade_level: string;
   subject: string;
   topic: string;
-  status: "pending" | "completed" | "failed";
+  status: "pending" | "processing" | "completed" | "failed";
   generated_content?: {
     title?: string;
     objectives?: string[];
@@ -23,6 +23,22 @@ export interface PaginatedLessonPlans {
   total: number;
   skip: number;
   limit: number;
+}
+
+export interface CreateLessonPlanPayload {
+  grade_level: string;
+  subject: string;
+  topic: string;
+}
+
+export interface CreateLessonPlanResponse {
+  job_id: string;
+  id: string;
+}
+
+export async function createLessonPlan(payload: CreateLessonPlanPayload): Promise<CreateLessonPlanResponse> {
+  const res = await apiClient.post<CreateLessonPlanResponse>("/api/lesson-plans", payload);
+  return res.data;
 }
 
 export async function getLessonPlans(skip = 0, limit = 20): Promise<PaginatedLessonPlans> {
@@ -48,7 +64,19 @@ export async function deleteLessonPlan(id: string): Promise<void> {
   await apiClient.delete(`/api/lesson-plans/${id}`);
 }
 
-export function getLessonPlanPdfExportUrl(id: string): string {
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
-  return `${baseUrl}/api/lesson-plans/${id}/export/pdf`;
+export async function downloadLessonPlanPdf(id: string, topicName = "Modul_Ajar"): Promise<void> {
+  const response = await apiClient.get(`/api/lesson-plans/${id}/export/pdf`, {
+    responseType: "blob",
+  });
+
+  const blob = new Blob([response.data], { type: "application/pdf" });
+  const downloadUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = downloadUrl;
+  const safeFilename = `${topicName.replace(/\s+/g, "_")}.pdf`;
+  link.setAttribute("download", safeFilename);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(downloadUrl);
 }
