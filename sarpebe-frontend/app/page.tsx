@@ -22,7 +22,7 @@ const STEPS = [
   },
   {
     title: "Sunting, lalu unduh PDF",
-    body: "Ubah tujuan, kegiatan, media, dan asesmen langsung di halaman. Sumber rujukan tetap tercantum di akhir modul.",
+    body: "Ubah tujuan, tabel kegiatan, rubrik, dan lampiran langsung di halaman. Sumber rujukan tetap tercantum di akhir modul.",
   },
 ];
 

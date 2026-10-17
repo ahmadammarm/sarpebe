@@ -9,7 +9,7 @@ import {
   getLessonPlans,
   updateLessonPlan,
 } from "@/lib/api/lesson-plans";
-import type { LessonPlan, LessonPlanContent, LessonPlanStatus } from "@/types/lesson-plan";
+import type { AnyLessonPlanContent, LessonPlan, LessonPlanStatus } from "@/types/lesson-plan";
 
 const POLL_INTERVAL_MS = 3000;
 
@@ -59,7 +59,7 @@ export function useCreateLessonPlan() {
 export function useUpdateLessonPlan(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (content: LessonPlanContent) => updateLessonPlan(id, content),
+    mutationFn: (content: AnyLessonPlanContent) => updateLessonPlan(id, content),
     onSuccess: (updated: LessonPlan) => {
       queryClient.setQueryData(lessonPlanKeys.detail(id), updated);
       queryClient.invalidateQueries({ queryKey: [...lessonPlanKeys.all, "list"] });

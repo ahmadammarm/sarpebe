@@ -94,7 +94,7 @@ export function LessonPlanDashboard() {
           <p className="font-hand text-3xl text-ink-soft">Halaman ini masih kosong.</p>
           <h2 className="mt-2 text-2xl font-bold">Mulai dari satu topik.</h2>
           <p className="mt-3 max-w-md text-ink-soft">
-            Pilih kelas, mata pelajaran, dan topik. Modul pertama Anda biasanya selesai dalam kurang dari satu menit.
+            Pilih kelas, mata pelajaran, dan topik. Modul biasanya selesai dalam 20 sampai 60 detik.
           </p>
           <Link href="/lesson-plans/new" className={buttonVariants({ className: "mt-6" })}>
             <Plus aria-hidden />

@@ -4,7 +4,7 @@ import type {
   CreateLessonPlanResponse,
   JobStatus,
   LessonPlan,
-  LessonPlanContent,
+  AnyLessonPlanContent,
   PaginatedLessonPlans,
 } from "@/types/lesson-plan";
 
@@ -25,7 +25,7 @@ export async function getLessonPlan(id: string): Promise<LessonPlan> {
   return res.data;
 }
 
-export async function updateLessonPlan(id: string, generatedContent: LessonPlanContent): Promise<LessonPlan> {
+export async function updateLessonPlan(id: string, generatedContent: AnyLessonPlanContent): Promise<LessonPlan> {
   const res = await apiClient.put<LessonPlan>(`/api/lesson-plans/${id}`, {
     generated_content: generatedContent,
   });

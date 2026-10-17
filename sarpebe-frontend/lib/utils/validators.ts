@@ -34,6 +34,18 @@ export const resetPasswordSchema = z
     message: "Password tidak sama.",
   });
 
+export const MAX_CLASS_NOTES = 500;
+
+const TEACHING_MODEL_VALUES = [
+  "otomatis",
+  "diskusi_kelompok",
+  "pjbl",
+  "pbl",
+  "inkuiri",
+  "kooperatif",
+  "ceramah_interaktif",
+] as const;
+
 export const lessonPlanCreateSchema = z.object({
   grade_level: z
     .string()
@@ -50,6 +62,21 @@ export const lessonPlanCreateSchema = z.object({
     .trim()
     .min(1, "Topik wajib diisi.")
     .max(300, "Topik maksimal 300 karakter."),
+  meeting_count: z
+    .number({ message: "Jumlah pertemuan harus berupa angka." })
+    .int("Jumlah pertemuan harus bilangan bulat.")
+    .min(1, "Minimal 1 pertemuan.")
+    .max(6, "Maksimal 6 pertemuan."),
+  minutes_per_meeting: z
+    .number({ message: "Menit per pertemuan harus berupa angka." })
+    .int("Menit per pertemuan harus bilangan bulat.")
+    .min(20, "Minimal 20 menit.")
+    .max(240, "Maksimal 240 menit."),
+  teaching_model: z.enum(TEACHING_MODEL_VALUES),
+  class_notes: z
+    .string()
+    .trim()
+    .max(MAX_CLASS_NOTES, `Catatan maksimal ${MAX_CLASS_NOTES} karakter.`),
 });
 
 export const MAX_UPLOAD_MB = 20;

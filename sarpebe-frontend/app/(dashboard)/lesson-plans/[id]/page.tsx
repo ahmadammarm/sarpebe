@@ -8,6 +8,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { GenerationProgress } from "@/components/features/lesson-plans/GenerationProgress";
 import { LessonPlanEditor } from "@/components/features/lesson-plans/LessonPlanEditor";
+import { LessonPlanEditorV2 } from "@/components/features/lesson-plans/LessonPlanEditorV2";
 import { useCreateLessonPlan, useLessonPlan } from "@/lib/hooks/useLessonPlans";
 import { getErrorMessage } from "@/lib/utils/errors";
 import { describeFailure } from "@/lib/utils/lesson-plan";
@@ -22,11 +23,16 @@ export default function LessonPlanDetailPage() {
 
   const handleRegenerate = async () => {
     if (!plan) return;
+    const options = plan.request_options;
     try {
       const created = await regenerate.mutateAsync({
         grade_level: plan.grade_level,
         subject: plan.subject,
         topic: plan.topic,
+        meeting_count: options?.meeting_count ?? 1,
+        minutes_per_meeting: options?.minutes_per_meeting ?? 80,
+        teaching_model: options?.teaching_model ?? "otomatis",
+        class_notes: options?.class_notes ?? "",
       });
       router.push(`/lesson-plans/${created.id}`);
     } catch {
@@ -52,7 +58,11 @@ export default function LessonPlanDetailPage() {
   }
 
   if (plan.status === "completed") {
-    return <LessonPlanEditor key={plan.id} plan={plan} />;
+    return plan.schema_version === 2 ? (
+      <LessonPlanEditorV2 key={plan.id} plan={plan} />
+    ) : (
+      <LessonPlanEditor key={plan.id} plan={plan} />
+    );
   }
 
   const failure = describeFailure(plan.generated_content?.error);

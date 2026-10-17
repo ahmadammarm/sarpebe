@@ -3,10 +3,15 @@ import { Mark } from "@/components/brand/Mark";
 import { Sheet } from "@/components/brand/Sheet";
 
 const ACTIVITIES = [
-  { duration: "15 menit", description: "Pembukaan: guru mengajak peserta didik menyebutkan pelaku ekonomi yang mereka temui hari ini." },
-  { duration: "40 menit", description: "Diskusi kelompok: memetakan alur produksi, distribusi, dan konsumsi satu barang." },
-  { duration: "20 menit", description: "Presentasi peta alur, lalu umpan balik antarkelompok." },
-  { duration: "15 menit", description: "Refleksi: setiap peserta didik menulis satu hal yang berubah dalam cara mereka memandang pasar." },
+  { stage: "Pendahuluan", minutes: "15", description: "Guru mengajak peserta didik menyebutkan pelaku ekonomi yang mereka temui hari ini." },
+  { stage: "Inti", minutes: "40", description: "Diskusi kelompok: memetakan alur produksi, distribusi, dan konsumsi satu barang." },
+  { stage: "Inti", minutes: "20", description: "Presentasi peta alur, lalu umpan balik antarkelompok." },
+  { stage: "Penutup", minutes: "5", description: "Setiap peserta didik menulis satu hal yang berubah dalam cara mereka memandang pasar." },
+];
+
+const RUBRIC = [
+  { criterion: "Ketepatan peta alur", good: "Semua tahap benar dan berurutan", fair: "Satu tahap keliru" },
+  { criterion: "Kerja sama kelompok", good: "Semua anggota berperan", fair: "Sebagian anggota berperan" },
 ];
 
 const MATERIALS = ["Buku teks IPS kelas 9", "Data pasar tradisional setempat", "Lembar kerja peserta didik"];
@@ -50,15 +55,28 @@ export function SampleModule() {
           </section>
 
           <section aria-label="Kegiatan pembelajaran">
-            <SectionTitle>Kegiatan pembelajaran</SectionTitle>
-            <ul className="mt-3 divide-y divide-rule border-y border-rule">
-              {ACTIVITIES.map((activity) => (
-                <li key={activity.duration + activity.description} className="grid gap-1 py-3 sm:grid-cols-[6.5rem_minmax(0,1fr)] sm:gap-4">
-                  <span className="text-sm font-semibold text-ballpoint">{activity.duration}</span>
-                  <span>{activity.description}</span>
-                </li>
-              ))}
-            </ul>
+            <SectionTitle>Kegiatan pembelajaran, pertemuan 1 (80 menit)</SectionTitle>
+            <div className="mt-3 overflow-x-auto rounded-md border border-rule-strong">
+              <table className="w-full min-w-[30rem] border-collapse text-left text-sm">
+                <caption className="sr-only">Kegiatan pertemuan 1</caption>
+                <thead className="bg-wash">
+                  <tr>
+                    <th scope="col" className="px-3 py-2 font-semibold">Tahap</th>
+                    <th scope="col" className="px-3 py-2 font-semibold">Menit</th>
+                    <th scope="col" className="px-3 py-2 font-semibold">Kegiatan</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ACTIVITIES.map((activity) => (
+                    <tr key={activity.description} className="border-t border-rule align-top">
+                      <td className="px-3 py-2 font-semibold text-ballpoint">{activity.stage}</td>
+                      <td className="px-3 py-2 tabular-nums">{activity.minutes}</td>
+                      <td className="px-3 py-2">{activity.description}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </section>
 
           <div className="grid gap-8 sm:grid-cols-2">
@@ -77,10 +95,35 @@ export function SampleModule() {
             <section aria-label="Asesmen">
               <SectionTitle>Asesmen</SectionTitle>
               <p className="mt-3">
-                Penilaian formatif lewat presentasi peta alur dan refleksi tertulis singkat.
+                Formatif lewat presentasi peta alur, dengan rubrik berikut.
               </p>
             </section>
           </div>
+
+          <section aria-label="Rubrik penilaian">
+            <SectionTitle>Rubrik penilaian</SectionTitle>
+            <div className="mt-3 overflow-x-auto rounded-md border border-rule-strong">
+              <table className="w-full min-w-[30rem] border-collapse text-left text-sm">
+                <caption className="sr-only">Rubrik penilaian presentasi</caption>
+                <thead className="bg-wash">
+                  <tr>
+                    <th scope="col" className="px-3 py-2 font-semibold">Kriteria</th>
+                    <th scope="col" className="px-3 py-2 font-semibold">3 (Baik)</th>
+                    <th scope="col" className="px-3 py-2 font-semibold">2 (Cukup)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {RUBRIC.map((row) => (
+                    <tr key={row.criterion} className="border-t border-rule align-top">
+                      <th scope="row" className="px-3 py-2 font-semibold">{row.criterion}</th>
+                      <td className="px-3 py-2">{row.good}</td>
+                      <td className="px-3 py-2">{row.fair}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
 
           <section aria-label="Sumber rujukan">
             <SectionTitle>Sumber rujukan</SectionTitle>

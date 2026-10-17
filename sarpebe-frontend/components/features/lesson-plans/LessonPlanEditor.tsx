@@ -13,10 +13,10 @@ import { Notice } from "@/components/ui/notice";
 import { Textarea } from "@/components/ui/textarea";
 import { useDownloadLessonPlanPdf, useUpdateLessonPlan } from "@/lib/hooks/useLessonPlans";
 import { getErrorMessage } from "@/lib/utils/errors";
-import type { LessonActivity, LessonPlan, LessonPlanContent } from "@/types/lesson-plan";
+import type { LessonActivity, LessonPlanContent, LessonPlanV1 } from "@/types/lesson-plan";
 
 interface LessonPlanEditorProps {
-  plan: LessonPlan;
+  plan: LessonPlanV1;
 }
 
 /** Drops blank lines and empty activities, so what is saved is what a reader would see. */
@@ -88,7 +88,7 @@ export function LessonPlanEditor({ plan }: LessonPlanEditorProps) {
       setErrorMsg(null);
       const tidied = tidy(content);
       const updated = await updatePlan.mutateAsync(tidied);
-      const stored = updated.generated_content ?? tidied;
+      const stored = (updated.generated_content as LessonPlanContent | null) ?? tidied;
       setContent(stored);
       setSaved(stored);
       setJustSaved(true);

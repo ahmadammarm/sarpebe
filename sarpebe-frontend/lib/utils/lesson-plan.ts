@@ -1,4 +1,5 @@
 const NO_CONTEXT_MARKER = "Belum ada dokumen kurikulum";
+const NOT_COVERED_MARKER = "belum membahas topik ini";
 const CRASH_MARKER = "Task crashed";
 
 export interface FailureDescription {
@@ -16,6 +17,13 @@ export function describeFailure(error: string | null | undefined): FailureDescri
     return {
       message: "Belum ada dokumen kurikulum untuk kelas dan mata pelajaran ini.",
       hint: "Minta administrator mengunggah dokumen CP untuk kelas dan mata pelajaran tersebut, atau periksa penulisannya.",
+    };
+  }
+
+  if (error?.includes(NOT_COVERED_MARKER)) {
+    return {
+      message: "Dokumen kurikulum yang tersedia belum membahas topik ini.",
+      hint: "Ubah topiknya agar sesuai dengan isi CP, atau minta administrator mengunggah dokumen yang memuatnya.",
     };
   }
 

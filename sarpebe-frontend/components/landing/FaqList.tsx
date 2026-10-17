@@ -15,7 +15,7 @@ const QUESTIONS = [
   {
     question: "Apakah saya bisa mengubah hasilnya?",
     answer:
-      "Bisa. Judul, tujuan, kegiatan, media, dan asesmen dapat disunting langsung di halaman, lalu diunduh sebagai PDF. Sumber rujukan dicatat otomatis dan tidak bisa disunting.",
+      "Bisa. Judul, tujuan, tabel kegiatan, rubrik, dan lampiran dapat disunting langsung di halaman, sel demi sel, lalu diunduh sebagai PDF. Sumber rujukan dicatat otomatis dan tidak bisa disunting.",
   },
   {
     question: "Apakah hasilnya pasti benar?",
@@ -25,7 +25,7 @@ const QUESTIONS = [
   {
     question: "Berapa lama modul disusun?",
     answer:
-      "Biasanya kurang dari satu menit. Anda boleh menutup halaman selama proses berjalan; modul tetap tersimpan di daftar Modul ajar saya.",
+      "Biasanya 20 sampai 60 detik. Anda boleh menutup halaman selama proses berjalan; modul tetap tersimpan di daftar Modul ajar saya.",
   },
   {
     question: "Siapa yang bisa melihat modul saya?",
