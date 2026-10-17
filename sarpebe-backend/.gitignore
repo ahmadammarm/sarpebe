@@ -21,3 +21,7 @@ celerybeat.pid
 dist/
 build/
 *.egg-info/
+
+# Evaluation data and reports (generated, may contain document excerpts)
+evals/data/*.jsonl
+evals/reports/
