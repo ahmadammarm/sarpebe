@@ -44,7 +44,7 @@ export const authOptions: NextAuthOptions = {
             role = res.data.role;
           }
         } catch (e) {
-          console.warn("Could not fetch user profile role from backend, defaulting to 'user':", (e as any)?.message);
+          console.warn("Could not fetch user profile role from backend, defaulting to 'user':", e instanceof Error ? e.message : e);
         }
 
         return {
@@ -53,7 +53,7 @@ export const authOptions: NextAuthOptions = {
           name: data.user.user_metadata?.full_name || "Educator",
           role,
           access_token: accessToken,
-        } as any;
+        };
       }
     })
   ],
@@ -64,16 +64,16 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        token.role = (user as any).role || "user";
-        token.accessToken = (user as any).access_token;
+        token.role = user.role || "user";
+        token.accessToken = user.access_token;
       }
       return token;
     },
     async session({ session, token }) {
       if (token) {
-        (session.user as any).id = token.id;
-        (session.user as any).role = token.role || "user";
-        (session as any).supabaseAccessToken = token.accessToken;
+        session.user.id = token.id ?? "";
+        session.user.role = token.role || "user";
+        session.supabaseAccessToken = token.accessToken;
       }
       return session;
     },

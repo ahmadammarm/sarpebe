@@ -2,61 +2,64 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createLessonPlan } from "@/lib/api/lesson-plans";
-import { useJobSSE } from "@/lib/hooks/useJobSSE";
+import { useCreateLessonPlan } from "@/lib/hooks/useLessonPlans";
+import { useJobStatus } from "@/lib/hooks/useJobStatus";
+import { getErrorMessage } from "@/lib/utils/errors";
+import { lessonPlanCreateSchema, zodFieldErrors } from "@/lib/utils/validators";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft, Sparkles, Loader2, CheckCircle2, AlertCircle, BookOpen, Layers, Compass } from "lucide-react";
+
+type FieldName = "grade_level" | "subject" | "topic";
 
 export default function NewLessonPlanPage() {
   const router = useRouter();
+  const createPlan = useCreateLessonPlan();
 
   const [gradeLevel, setGradeLevel] = useState("");
   const [subject, setSubject] = useState("");
   const [topic, setTopic] = useState("");
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [createdPlanId, setCreatedPlanId] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldName, string>>>({});
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const { status: sseStatus, isDone, error: sseError } = useJobSSE(activeJobId);
+  const { status: jobStatus, isDone, error: jobError } = useJobStatus(activeJobId);
+  const isSubmitting = createPlan.isPending || (activeJobId !== null && !isDone);
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!gradeLevel || !subject || !topic) {
-      setErrorMsg("Mohon lengkapi semua data formulir.");
+    setErrorMsg(null);
+
+    const parsed = lessonPlanCreateSchema.safeParse({ grade_level: gradeLevel, subject, topic });
+    if (!parsed.success) {
+      setFieldErrors(zodFieldErrors<FieldName>(parsed.error));
       return;
     }
+    setFieldErrors({});
 
     try {
-      setIsSubmitting(true);
-      setErrorMsg(null);
-
-      const response = await createLessonPlan({
-        grade_level: gradeLevel,
-        subject,
-        topic,
-      });
-
+      const response = await createPlan.mutateAsync(parsed.data);
       setCreatedPlanId(response.id);
       setActiveJobId(response.job_id);
-    } catch (err: any) {
-      setErrorMsg(err?.response?.data?.detail || "Gagal memulai pembuatan rencana pembelajaran.");
-      setIsSubmitting(false);
+    } catch (err) {
+      setErrorMsg(getErrorMessage(err, "Gagal memulai pembuatan rencana pembelajaran."));
     }
   };
 
   useEffect(() => {
-    if (isDone && sseStatus === "completed" && createdPlanId) {
+    if (isDone && jobStatus === "completed" && createdPlanId) {
       const timer = setTimeout(() => {
         router.push(`/lesson-plans/${createdPlanId}`);
       }, 1200);
       return () => clearTimeout(timer);
     }
-  }, [isDone, sseStatus, createdPlanId, router]);
+  }, [isDone, jobStatus, createdPlanId, router]);
+
+  const failed = jobStatus === "failed";
 
   return (
     <div className="container mx-auto px-6 py-8 max-w-2xl">
@@ -84,7 +87,7 @@ export default function NewLessonPlanPage() {
 
         <CardContent className="p-6 sm:p-8">
           {!activeJobId ? (
-            <form onSubmit={handleGenerate} className="space-y-5">
+            <form onSubmit={handleGenerate} className="space-y-5" noValidate>
               <div className="space-y-1.5">
                 <Label htmlFor="gradeLevel" className="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                   <Layers className="h-3.5 w-3.5 text-emerald-600" />
@@ -96,9 +99,10 @@ export default function NewLessonPlanPage() {
                   value={gradeLevel}
                   onChange={(e) => setGradeLevel(e.target.value)}
                   disabled={isSubmitting}
+                  aria-invalid={Boolean(fieldErrors.grade_level)}
                   className="focus-visible:ring-emerald-500"
-                  required
                 />
+                {fieldErrors.grade_level && <p className="text-xs text-rose-600">{fieldErrors.grade_level}</p>}
               </div>
 
               <div className="space-y-1.5">
@@ -112,9 +116,10 @@ export default function NewLessonPlanPage() {
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
                   disabled={isSubmitting}
+                  aria-invalid={Boolean(fieldErrors.subject)}
                   className="focus-visible:ring-emerald-500"
-                  required
                 />
+                {fieldErrors.subject && <p className="text-xs text-rose-600">{fieldErrors.subject}</p>}
               </div>
 
               <div className="space-y-1.5">
@@ -128,9 +133,10 @@ export default function NewLessonPlanPage() {
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
                   disabled={isSubmitting}
+                  aria-invalid={Boolean(fieldErrors.topic)}
                   className="focus-visible:ring-emerald-500"
-                  required
                 />
+                {fieldErrors.topic && <p className="text-xs text-rose-600">{fieldErrors.topic}</p>}
               </div>
 
               {errorMsg && (
@@ -147,7 +153,7 @@ export default function NewLessonPlanPage() {
                   className="w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/25 h-11"
                   disabled={isSubmitting}
                 >
-                  {isSubmitting ? (
+                  {createPlan.isPending ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       Memulai Pembuatan...
@@ -163,7 +169,7 @@ export default function NewLessonPlanPage() {
             </form>
           ) : (
             <div className="py-10 text-center space-y-5">
-              {sseStatus === "completed" ? (
+              {jobStatus === "completed" ? (
                 <>
                   <div className="h-16 w-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-sm animate-bounce">
                     <CheckCircle2 className="h-9 w-9" />
@@ -173,20 +179,20 @@ export default function NewLessonPlanPage() {
                     Modul ajar telah selesai digenerate dan diverifikasi. Mengalihkan ke editor modul...
                   </p>
                 </>
-              ) : sseStatus === "failed" || sseError ? (
+              ) : failed ? (
                 <>
                   <div className="h-16 w-16 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto shadow-sm">
                     <AlertCircle className="h-8 w-8" />
                   </div>
                   <h3 className="text-xl font-bold text-slate-900">Gagal Menyusun Modul</h3>
                   <p className="text-sm text-slate-600 max-w-sm mx-auto">
-                    {sseError || "Terjadi kendala saat menghubungkan ke AI atau mengekstrak rujukan kurikulum."}
+                    {jobError || "Terjadi kendala saat menghubungkan ke AI atau mengekstrak rujukan kurikulum."}
                   </p>
                   <Button
                     variant="outline"
                     onClick={() => {
                       setActiveJobId(null);
-                      setIsSubmitting(false);
+                      setCreatedPlanId(null);
                     }}
                     className="mt-2"
                   >
@@ -206,8 +212,9 @@ export default function NewLessonPlanPage() {
                       AI Sedang Menyusun Rencana Pembelajaran...
                     </h3>
                     <div className="inline-flex items-center gap-2 mt-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-800 text-xs font-semibold">
-                      Status Pekerjaan: <span className="uppercase">{sseStatus}</span>
+                      Status Pekerjaan: <span className="uppercase">{jobStatus}</span>
                     </div>
+                    {jobError && <p className="text-xs text-amber-600 mt-2">{jobError}</p>}
                   </div>
                   <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
                     Sistem sedang mencari potongan teks Capaian Pembelajaran (CP) terkait di pgvector dan menyusun RPP berstandar Kemendikbud via Google Gemini.

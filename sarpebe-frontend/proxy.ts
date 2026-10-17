@@ -9,7 +9,7 @@ export default withAuth(
 
     // Rute /curriculum hanya boleh diakses oleh pengguna dengan role 'admin'
     if (pathname.startsWith("/curriculum")) {
-      const role = (token as any)?.role;
+      const role = token?.role;
       if (role !== "admin") {
         const redirectUrl = new URL("/lesson-plans", req.url);
         redirectUrl.searchParams.set("error", "unauthorized_admin");

@@ -65,9 +65,9 @@ sarpebe-frontend/
 │   │   ├── lesson-plans.ts     # Lesson plan API functions
 │   │   └── curriculum.ts      # Curriculum document API functions
 │   ├── hooks/                  # Custom React hooks (abstract data fetching from UI)
-│   │   ├── useLessonPlans.ts
-│   │   ├── useLessonPlan.ts
-│   │   └── useJobPolling.ts    # Polls job status until generation completes
+│   │   ├── useLessonPlans.ts   # List/detail/mutations (TanStack Query)
+│   │   ├── useCurriculum.ts
+│   │   └── useJobStatus.ts     # SSE with polling fallback until generation completes
 │   ├── stores/                 # Global client state (Zustand or React Context)
 │   │   └── auth-store.ts
 │   └── utils/

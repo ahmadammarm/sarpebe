@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { CurriculumDocument, getCurriculumDocuments } from "@/lib/api/curriculum";
+import { useCurriculumDocuments } from "@/lib/hooks/useCurriculum";
 import { UploadForm } from "@/components/features/curriculum/UploadForm";
 import { CurriculumList } from "@/components/features/curriculum/CurriculumList";
 import { useSession } from "next-auth/react";
@@ -11,28 +10,10 @@ import Link from "next/link";
 
 export default function CurriculumPage() {
   const { data: session, status } = useSession();
-  const [documents, setDocuments] = useState<CurriculumDocument[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const role = session?.user.role;
+  const isAdmin = status === "authenticated" && role === "admin";
 
-  const role = (session?.user as any)?.role;
-
-  const fetchDocs = async () => {
-    try {
-      setLoading(true);
-      const data = await getCurriculumDocuments();
-      setDocuments(data);
-    } catch (err) {
-      console.error("Gagal mengambil data kurikulum:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (status === "authenticated" && role === "admin") {
-      fetchDocs();
-    }
-  }, [status, role]);
+  const { data: documents = [], isLoading, isError } = useCurriculumDocuments(isAdmin);
 
   if (status === "loading") {
     return (
@@ -77,13 +58,15 @@ export default function CurriculumPage() {
         </div>
       </div>
 
-      <UploadForm onUploadSuccess={fetchDocs} />
+      <UploadForm />
 
       <h2 className="text-xl font-semibold mb-4 text-gray-800">Daftar Dokumen Kurikulum</h2>
-      {loading ? (
+      {isLoading ? (
         <div className="text-center p-8">Memuat dokumen...</div>
+      ) : isError ? (
+        <div className="text-center p-8 text-rose-600">Gagal mengambil data kurikulum.</div>
       ) : (
-        <CurriculumList documents={documents} onDocumentDeleted={fetchDocs} />
+        <CurriculumList documents={documents} />
       )}
     </div>
   );

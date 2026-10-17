@@ -1,17 +1,26 @@
 "use client";
 
-import { CurriculumDocument, deleteCurriculumDocument } from "@/lib/api/curriculum";
+import { useDeleteCurriculumDocument } from "@/lib/hooks/useCurriculum";
+import { getErrorMessage } from "@/lib/utils/errors";
+import type { CurriculumDocument } from "@/types/curriculum";
 import { Button } from "@/components/ui/button";
 import { Trash2, FileText, CheckCircle2, Clock, AlertCircle, ExternalLink } from "lucide-react";
 import { useState } from "react";
 
 interface CurriculumListProps {
   documents: CurriculumDocument[];
-  onDocumentDeleted: () => void;
 }
 
-export function CurriculumList({ documents, onDocumentDeleted }: CurriculumListProps) {
+const DOCUMENT_TYPE_LABELS: Record<CurriculumDocument["document_type"], string> = {
+  CP: "CP",
+  ATP: "ATP",
+  BUKU_GURU: "Buku Guru",
+};
+
+export function CurriculumList({ documents }: CurriculumListProps) {
+  const deleteDocument = useDeleteCurriculumDocument();
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Apakah Anda yakin ingin menghapus dokumen kurikulum ini beserta data vektornya?")) {
@@ -20,10 +29,10 @@ export function CurriculumList({ documents, onDocumentDeleted }: CurriculumListP
 
     try {
       setDeletingId(id);
-      await deleteCurriculumDocument(id);
-      onDocumentDeleted();
+      setDeleteError(null);
+      await deleteDocument.mutateAsync(id);
     } catch (err) {
-      alert("Gagal menghapus dokumen kurikulum.");
+      setDeleteError(getErrorMessage(err, "Gagal menghapus dokumen kurikulum."));
     } finally {
       setDeletingId(null);
     }
@@ -45,12 +54,19 @@ export function CurriculumList({ documents, onDocumentDeleted }: CurriculumListP
 
   return (
     <div className="border border-slate-200/80 rounded-xl overflow-hidden bg-white shadow-xs">
+      {deleteError && (
+        <div className="px-6 py-3 bg-rose-50 border-b border-rose-200 text-rose-800 text-sm flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+          {deleteError}
+        </div>
+      )}
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-100 text-sm">
           <thead className="bg-slate-50 text-slate-500 font-semibold text-xs uppercase tracking-wider">
             <tr>
               <th className="px-6 py-3.5 text-left">Judul Dokumen</th>
               <th className="px-6 py-3.5 text-left">Tipe</th>
+              <th className="px-6 py-3.5 text-left">Kelas / Mapel</th>
               <th className="px-6 py-3.5 text-left">Status Pemrosesan</th>
               <th className="px-6 py-3.5 text-left">Waktu Unggah</th>
               <th className="px-6 py-3.5 text-right">Aksi</th>
@@ -75,7 +91,18 @@ export function CurriculumList({ documents, onDocumentDeleted }: CurriculumListP
                     </a>
                   </div>
                 </td>
-                <td className="px-6 py-4 text-slate-500 uppercase text-xs font-semibold">{doc.document_type}</td>
+                <td className="px-6 py-4 text-slate-500 uppercase text-xs font-semibold">
+                  {DOCUMENT_TYPE_LABELS[doc.document_type] ?? doc.document_type}
+                </td>
+                <td className="px-6 py-4 text-slate-600 text-xs">
+                  {doc.grade_level || doc.subject ? (
+                    <span className="capitalize">
+                      Kelas {doc.grade_level ?? "-"} · {doc.subject ?? "-"}
+                    </span>
+                  ) : (
+                    "-"
+                  )}
+                </td>
                 <td className="px-6 py-4">
                   {doc.status === "completed" && (
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">

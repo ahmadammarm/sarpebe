@@ -1,40 +1,51 @@
 "use client";
 
 import { useState } from "react";
-import { LessonPlan, updateLessonPlan, downloadLessonPlanPdf } from "@/lib/api/lesson-plans";
+import { useDownloadLessonPlanPdf, useUpdateLessonPlan } from "@/lib/hooks/useLessonPlans";
+import { getErrorMessage } from "@/lib/utils/errors";
+import type { LessonPlan, LessonPlanContent } from "@/types/lesson-plan";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Download, Save, BookOpen, Target, Sparkles, FileText, CheckCircle2, Bookmark } from "lucide-react";
+import { Download, Save, BookOpen, Target, Sparkles, FileText, CheckCircle2, Bookmark, AlertCircle } from "lucide-react";
 
 interface LessonPlanEditorProps {
   plan: LessonPlan;
-  onUpdate: (updatedPlan: LessonPlan) => void;
 }
 
-export function LessonPlanEditor({ plan, onUpdate }: LessonPlanEditorProps) {
-  const [content, setContent] = useState<any>(plan.generated_content || {});
-  const [isSaving, setIsSaving] = useState(false);
+export function LessonPlanEditor({ plan }: LessonPlanEditorProps) {
+  const [content, setContent] = useState<LessonPlanContent>(plan.generated_content ?? {});
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const updatePlan = useUpdateLessonPlan(plan.id);
+  const downloadPdf = useDownloadLessonPlanPdf();
+  const isSaving = updatePlan.isPending;
 
   const handleSave = async () => {
     try {
-      setIsSaving(true);
       setSaveSuccess(false);
-      const updated = await updateLessonPlan(plan.id, content);
-      onUpdate(updated);
+      setErrorMsg(null);
+      await updatePlan.mutateAsync(content);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err) {
-      alert("Gagal menyimpan perubahan modul ajar.");
-    } finally {
-      setIsSaving(false);
+      setErrorMsg(getErrorMessage(err, "Gagal menyimpan perubahan modul ajar."));
     }
   };
 
-  const updateField = (field: string, value: any) => {
-    setContent((prev: any) => ({ ...prev, [field]: value }));
+  const handleDownload = async () => {
+    try {
+      setErrorMsg(null);
+      await downloadPdf.mutateAsync({ id: plan.id, topic: content.title || plan.topic });
+    } catch (err) {
+      setErrorMsg(getErrorMessage(err, "Gagal mengunduh PDF modul ajar."));
+    }
+  };
+
+  const updateField = <K extends keyof LessonPlanContent>(field: K, value: LessonPlanContent[K]) => {
+    setContent((prev) => ({ ...prev, [field]: value }));
   };
 
   return (
@@ -61,13 +72,7 @@ export function LessonPlanEditor({ plan, onUpdate }: LessonPlanEditorProps) {
             variant="outline"
             type="button"
             className="border-emerald-200 text-emerald-800 hover:bg-emerald-50"
-            onClick={async () => {
-              try {
-                await downloadLessonPlanPdf(plan.id, content.title || plan.topic);
-              } catch (e) {
-                alert("Gagal mengunduh PDF modul ajar.");
-              }
-            }}
+            onClick={handleDownload}
           >
             <Download className="h-4 w-4 mr-2 text-emerald-600" />
             Unduh PDF
@@ -78,6 +83,13 @@ export function LessonPlanEditor({ plan, onUpdate }: LessonPlanEditorProps) {
           </Button>
         </div>
       </div>
+
+      {errorMsg && (
+        <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-sm flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+          {errorMsg}
+        </div>
+      )}
 
       {saveSuccess && (
         <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-sm flex items-center gap-2 animate-fade-in">
@@ -119,7 +131,7 @@ export function LessonPlanEditor({ plan, onUpdate }: LessonPlanEditorProps) {
         <CardContent className="pt-4">
           <textarea
             className="w-full min-h-[120px] p-3.5 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 leading-relaxed font-sans"
-            value={Array.isArray(content.objectives) ? content.objectives.join("\n") : content.objectives || ""}
+            value={(content.objectives ?? []).join("\n")}
             onChange={(e) => updateField("objectives", e.target.value.split("\n"))}
             placeholder="Pisahkan setiap tujuan dengan baris baru (enter)"
           />
@@ -137,7 +149,7 @@ export function LessonPlanEditor({ plan, onUpdate }: LessonPlanEditorProps) {
         <CardContent className="pt-4">
           <textarea
             className="w-full min-h-[100px] p-3.5 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 leading-relaxed font-sans"
-            value={Array.isArray(content.materials) ? content.materials.join("\n") : content.materials || ""}
+            value={(content.materials ?? []).join("\n")}
             onChange={(e) => updateField("materials", e.target.value.split("\n"))}
             placeholder="Pisahkan materi/media dengan baris baru"
           />
@@ -172,7 +184,7 @@ export function LessonPlanEditor({ plan, onUpdate }: LessonPlanEditorProps) {
           </CardHeader>
           <CardContent className="pt-4">
             <ul className="space-y-2 text-sm text-emerald-900">
-              {content.citations.map((cite: string, idx: number) => (
+              {content.citations.map((cite, idx) => (
                 <li key={idx} className="flex items-start gap-2 bg-white/80 p-2.5 rounded-lg border border-emerald-100">
                   <span className="h-5 w-5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
                     {idx + 1}

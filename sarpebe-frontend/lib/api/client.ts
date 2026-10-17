@@ -1,21 +1,24 @@
 import axios from "axios";
 import { getSession } from "next-auth/react";
 
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+
 export const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000",
+  baseURL: API_BASE_URL,
   headers: { "Content-Type": "application/json" },
 });
 
-apiClient.interceptors.request.use(async (config) => {
-  // Try to get session from NextAuth
+export async function getAuthToken(): Promise<string | undefined> {
   const session = await getSession();
-  
-  // Cast session to access our custom token property
-  const token = (session as any)?.supabaseAccessToken;
-  
+  return session?.supabaseAccessToken;
+}
+
+apiClient.interceptors.request.use(async (config) => {
+  const token = await getAuthToken();
+
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
-  
+
   return config;
 });

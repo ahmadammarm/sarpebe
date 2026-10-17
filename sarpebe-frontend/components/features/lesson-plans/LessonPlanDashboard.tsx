@@ -3,40 +3,44 @@
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { LessonPlan, getLessonPlans, deleteLessonPlan, downloadLessonPlanPdf } from "@/lib/api/lesson-plans";
-import { Plus, Trash2, Download, Edit3, BookOpen, Sparkles, Clock, CheckCircle2, AlertCircle } from "lucide-react";
+import { useState } from "react";
+import { useDeleteLessonPlan, useDownloadLessonPlanPdf, useLessonPlans } from "@/lib/hooks/useLessonPlans";
+import { getErrorMessage } from "@/lib/utils/errors";
+import { Plus, Trash2, Download, Edit3, BookOpen, Sparkles, Clock, CheckCircle2, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
+
+const PAGE_SIZE = 10;
 
 export function LessonPlanDashboard() {
   const { data: session, status } = useSession();
-  const [plans, setPlans] = useState<LessonPlan[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  const fetchPlans = async () => {
-    try {
-      setLoading(true);
-      const data = await getLessonPlans();
-      setPlans(data.items || []);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data, isLoading: loading, isError } = useLessonPlans(page * PAGE_SIZE, PAGE_SIZE, status === "authenticated");
+  const deletePlan = useDeleteLessonPlan();
+  const downloadPdf = useDownloadLessonPlanPdf();
 
-  useEffect(() => {
-    if (status === "authenticated") {
-      fetchPlans();
-    }
-  }, [status]);
+  const plans = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const handleDelete = async (id: string) => {
     if (!confirm("Hapus modul ajar ini?")) return;
     try {
-      await deleteLessonPlan(id);
-      fetchPlans();
+      setActionError(null);
+      await deletePlan.mutateAsync(id);
+      // Deleting the last item of the last page would leave an empty page.
+      if (plans.length === 1 && page > 0) setPage(page - 1);
     } catch (err) {
-      alert("Gagal menghapus rencana pembelajaran.");
+      setActionError(getErrorMessage(err, "Gagal menghapus rencana pembelajaran."));
+    }
+  };
+
+  const handleDownload = async (id: string, topic: string) => {
+    try {
+      setActionError(null);
+      await downloadPdf.mutateAsync({ id, topic });
+    } catch (err) {
+      setActionError(getErrorMessage(err, "Gagal mengunduh PDF modul ajar."));
     }
   };
 
@@ -84,7 +88,7 @@ export function LessonPlanDashboard() {
               Buat Modul Ajar Baru
             </Button>
           </Link>
-          {(session?.user as any)?.role === "admin" && (
+          {session?.user.role === "admin" && (
             <Link href="/curriculum">
               <Button variant="outline" className="border-emerald-200 text-emerald-800 hover:bg-emerald-50">
                 <BookOpen className="h-4 w-4 mr-2" />
@@ -102,7 +106,7 @@ export function LessonPlanDashboard() {
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Modul Ajar</span>
             <Sparkles className="h-4 w-4 text-emerald-600" />
           </div>
-          <div className="text-2xl font-extrabold text-emerald-950 mt-2">{plans.length}</div>
+          <div className="text-2xl font-extrabold text-emerald-950 mt-2">{total}</div>
         </div>
 
         <div className="bg-white border border-emerald-100 rounded-xl p-5 shadow-xs">
@@ -126,8 +130,15 @@ export function LessonPlanDashboard() {
       <div className="bg-white border border-slate-200/80 rounded-xl overflow-hidden shadow-xs">
         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
           <h2 className="font-bold text-slate-800 text-sm">Daftar Modul Ajar Tersimpan</h2>
-          <span className="text-xs text-slate-500">{plans.length} Dokumen</span>
+          <span className="text-xs text-slate-500">{total} Dokumen</span>
         </div>
+
+        {(actionError || isError) && (
+          <div className="px-6 py-3 bg-rose-50 border-b border-rose-200 text-rose-800 text-sm flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+            {actionError ?? "Gagal memuat daftar modul ajar."}
+          </div>
+        )}
 
         {loading ? (
           <div className="p-16 text-center text-slate-400 text-sm flex flex-col items-center justify-center">
@@ -208,13 +219,7 @@ export function LessonPlanDashboard() {
                           variant="outline"
                           size="sm"
                           className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                          onClick={async () => {
-                            try {
-                              await downloadLessonPlanPdf(plan.id, plan.topic);
-                            } catch (e) {
-                              alert("Gagal mengunduh PDF modul ajar.");
-                            }
-                          }}
+                          onClick={() => handleDownload(plan.id, plan.topic)}
                         >
                           <Download className="h-3.5 w-3.5 mr-1" />
                           PDF
@@ -233,6 +238,23 @@ export function LessonPlanDashboard() {
                 ))}
               </tbody>
             </table>
+            {pageCount > 1 && (
+              <div className="px-6 py-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                <span>
+                  Halaman {page + 1} dari {pageCount}
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(page - 1)}>
+                    <ChevronLeft className="h-3.5 w-3.5 mr-1" />
+                    Sebelumnya
+                  </Button>
+                  <Button variant="outline" size="sm" disabled={page + 1 >= pageCount} onClick={() => setPage(page + 1)}>
+                    Berikutnya
+                    <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

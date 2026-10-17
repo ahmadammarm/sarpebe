@@ -1,42 +1,14 @@
-import { apiClient } from "./client";
+import { API_BASE_URL, apiClient, getAuthToken } from "./client";
+import type { LessonPlanCreateInput } from "@/lib/utils/validators";
+import type {
+  CreateLessonPlanResponse,
+  JobStatus,
+  LessonPlan,
+  LessonPlanContent,
+  PaginatedLessonPlans,
+} from "@/types/lesson-plan";
 
-export interface LessonPlan {
-  id: string;
-  grade_level: string;
-  subject: string;
-  topic: string;
-  status: "pending" | "processing" | "completed" | "failed";
-  generated_content?: {
-    title?: string;
-    objectives?: string[];
-    materials?: string[];
-    activities?: { duration: string; description: string }[];
-    assessment?: string;
-    citations?: string[];
-    [key: string]: any;
-  } | null;
-  created_at: string;
-}
-
-export interface PaginatedLessonPlans {
-  items: LessonPlan[];
-  total: number;
-  skip: number;
-  limit: number;
-}
-
-export interface CreateLessonPlanPayload {
-  grade_level: string;
-  subject: string;
-  topic: string;
-}
-
-export interface CreateLessonPlanResponse {
-  job_id: string;
-  id: string;
-}
-
-export async function createLessonPlan(payload: CreateLessonPlanPayload): Promise<CreateLessonPlanResponse> {
+export async function createLessonPlan(payload: LessonPlanCreateInput): Promise<CreateLessonPlanResponse> {
   const res = await apiClient.post<CreateLessonPlanResponse>("/api/lesson-plans", payload);
   return res.data;
 }
@@ -53,7 +25,7 @@ export async function getLessonPlan(id: string): Promise<LessonPlan> {
   return res.data;
 }
 
-export async function updateLessonPlan(id: string, generatedContent: any): Promise<LessonPlan> {
+export async function updateLessonPlan(id: string, generatedContent: LessonPlanContent): Promise<LessonPlan> {
   const res = await apiClient.put<LessonPlan>(`/api/lesson-plans/${id}`, {
     generated_content: generatedContent,
   });
@@ -64,8 +36,60 @@ export async function deleteLessonPlan(id: string): Promise<void> {
   await apiClient.delete(`/api/lesson-plans/${id}`);
 }
 
+export async function getJobStatus(jobId: string): Promise<JobStatus> {
+  const res = await apiClient.get<JobStatus>(`/api/lesson-plans/jobs/${jobId}`);
+  return res.data;
+}
+
+/**
+ * Follows a job over Server-Sent Events. EventSource cannot send an Authorization header and
+ * axios cannot stream in the browser, so this is the one place that uses fetch directly.
+ *
+ * Calls `onEvent` for every status update; if it returns true the stream is closed.
+ * Resolves true when a terminal status was seen, false if the server closed the stream early.
+ * Rejects on HTTP/network errors so the caller can fall back to polling.
+ */
+export async function streamJobStatus(
+  jobId: string,
+  onEvent: (job: JobStatus) => boolean,
+  signal: AbortSignal
+): Promise<boolean> {
+  const token = await getAuthToken();
+  const res = await fetch(`${API_BASE_URL}/api/lesson-plans/jobs/${jobId}/stream`, {
+    headers: {
+      Accept: "text/event-stream",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    signal,
+  });
+  if (!res.ok || !res.body) {
+    throw new Error(`Job stream failed with status ${res.status}`);
+  }
+
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) return false;
+
+      buffer += value;
+      const events = buffer.split("\n\n");
+      buffer = events.pop() ?? "";
+
+      for (const event of events) {
+        const dataLine = event.split("\n").find((line) => line.startsWith("data: "));
+        if (!dataLine) continue;
+        if (onEvent(JSON.parse(dataLine.slice("data: ".length)) as JobStatus)) return true;
+      }
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+}
+
 export async function downloadLessonPlanPdf(id: string, topicName = "Modul_Ajar"): Promise<void> {
-  const response = await apiClient.get(`/api/lesson-plans/${id}/export/pdf`, {
+  const response = await apiClient.get<Blob>(`/api/lesson-plans/${id}/export/pdf`, {
     responseType: "blob",
   });
 

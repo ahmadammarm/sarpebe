@@ -13,7 +13,7 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const { data: session } = useSession();
-  const role = (session?.user as any)?.role || "user";
+  const role = session?.user.role || "user";
   const isAdmin = role === "admin";
 
   const isCurrent = (path: string) => {

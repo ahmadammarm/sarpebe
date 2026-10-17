@@ -116,7 +116,7 @@ sarpebe-frontend/
 ### 3. Async Generation and Job Polling
 
 - Lesson plan generation returns `202 Accepted` from the backend with a `job_id`.
-- The frontend must not assume the result is immediately available. After triggering generation, use `lib/hooks/useJobPolling.ts` to poll the job status endpoint at a regular interval.
+- The frontend must not assume the result is immediately available. After triggering generation, use `lib/hooks/useJobStatus.ts`, which follows the authenticated SSE stream and falls back to polling the job status endpoint with exponential backoff.
 - Show a loading/pending state to the user until the job resolves to `completed` or `failed`.
 - Implement exponential backoff or a reasonable fixed interval (e.g., 3 seconds) for polling. Do not poll faster than necessary.
 

@@ -6,7 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { registerSchema, RegisterFormData } from "@/lib/utils/validators";
+import { registerSchema, RegisterFormData, zodFieldErrors } from "@/lib/utils/validators";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { z } from "zod";
 import Link from "next/link";
@@ -53,11 +53,7 @@ export function RegisterForm() {
       }
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const newErrors: any = {};
-        (error as any).errors.forEach((err: any) => {
-          if (err.path[0]) newErrors[err.path[0]] = err.message;
-        });
-        setErrors(newErrors);
+        setErrors(zodFieldErrors(error));
       } else {
         setGlobalError("An unexpected error occurred.");
       }

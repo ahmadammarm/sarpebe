@@ -1,33 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { LessonPlan, getLessonPlan } from "@/lib/api/lesson-plans";
+import { useCreateLessonPlan, useLessonPlan } from "@/lib/hooks/useLessonPlans";
+import { getErrorMessage } from "@/lib/utils/errors";
 import { LessonPlanEditor } from "@/components/features/lesson-plans/LessonPlanEditor";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, AlertCircle, Loader2, RefreshCw } from "lucide-react";
 
 export default function LessonPlanDetailPage() {
-  const params = useParams();
+  const params = useParams<{ id: string }>();
   const router = useRouter();
-  const id = params.id as string;
+  const id = params.id;
 
-  const [plan, setPlan] = useState<LessonPlan | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: plan, isLoading, isError } = useLessonPlan(id);
+  const regenerate = useCreateLessonPlan();
 
-  useEffect(() => {
-    if (!id) return;
-    getLessonPlan(id)
-      .then((data) => setPlan(data))
-      .catch((err) => console.error(err))
-      .finally(() => setLoading(false));
-  }, [id]);
+  const handleRegenerate = async () => {
+    if (!plan) return;
+    try {
+      const created = await regenerate.mutateAsync({
+        grade_level: plan.grade_level,
+        subject: plan.subject,
+        topic: plan.topic,
+      });
+      router.push(`/lesson-plans/${created.id}`);
+    } catch {
+      // surfaced below through regenerate.error
+    }
+  };
 
-  if (loading) {
+  if (isLoading) {
     return <div className="p-8 text-center">Memuat Rencana Pembelajaran...</div>;
   }
 
-  if (!plan) {
+  if (isError || !plan) {
     return <div className="p-8 text-center text-red-500">Rencana Pembelajaran tidak ditemukan.</div>;
   }
 
@@ -42,7 +48,42 @@ export default function LessonPlanDetailPage() {
         Kembali ke Daftar
       </Button>
 
-      <LessonPlanEditor plan={plan} onUpdate={(updated) => setPlan(updated)} />
+      {(plan.status === "pending" || plan.status === "processing") && (
+        <div className="py-16 text-center space-y-4 bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+          <Loader2 className="h-10 w-10 animate-spin text-emerald-600 mx-auto" />
+          <h2 className="text-lg font-bold text-emerald-950">AI Sedang Menyusun Modul Ajar...</h2>
+          <p className="text-sm text-slate-500">
+            Topik: <strong>{plan.topic}</strong>. Halaman ini akan diperbarui otomatis setelah selesai.
+          </p>
+        </div>
+      )}
+
+      {plan.status === "failed" && (
+        <div className="py-12 px-6 text-center space-y-4 bg-white border border-rose-100 rounded-2xl shadow-xs">
+          <div className="h-14 w-14 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+            <AlertCircle className="h-7 w-7" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900">Gagal Menyusun Modul Ajar</h2>
+          <p className="text-sm text-slate-600 max-w-md mx-auto">
+            {plan.generated_content?.error ?? "Terjadi kendala saat menyusun modul ajar ini."}
+          </p>
+          {regenerate.isError && (
+            <p className="text-sm text-rose-600">
+              {getErrorMessage(regenerate.error, "Gagal memulai pembuatan ulang.")}
+            </p>
+          )}
+          <Button
+            onClick={handleRegenerate}
+            disabled={regenerate.isPending}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            {regenerate.isPending ? "Memulai..." : "Buat Ulang"}
+          </Button>
+        </div>
+      )}
+
+      {plan.status === "completed" && <LessonPlanEditor key={plan.id} plan={plan} />}
     </div>
   );
 }
