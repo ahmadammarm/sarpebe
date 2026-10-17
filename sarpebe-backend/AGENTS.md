@@ -102,17 +102,17 @@ app/
 - Gemini API calls take 10–30 seconds. Never await them in the HTTP request lifecycle.
 - Lesson plan generation endpoints must return `202 Accepted` immediately with a `job_id`.
 - The actual RAG pipeline (retrieve → prompt → generate → save) runs inside a Celery task.
-- Expose a separate `GET /lesson-plans/jobs/{job_id}` endpoint for the frontend to poll status.
+- Expose an authenticated `GET /lesson-plans/jobs/{job_id}` (and `/stream` for SSE) endpoint. Status is read from the owner's `lesson_plans` row; other users get 404.
 
 ### 4. Database Transactions
 
-- Any operation involving more than one write (e.g., save lesson plan + deduct quota + log cost) must be wrapped in a single transaction: `async with session.begin():`.
+- Any operation involving more than one write (e.g., create plan + dispatch job) must be wrapped in a single transaction: `async with session.begin():`.
 - On any exception within the block, SQLAlchemy automatically rolls back. Never manually call `session.rollback()` inside a `begin()` block.
 
 ### 5. Concurrency and Row-Level Locking
 
-- When reading a user's quota before decrementing it, always use `SELECT ... FOR UPDATE` (SQLAlchemy: `.with_for_update()`).
-- This prevents race conditions where two concurrent requests both read "1 quota remaining" and both proceed.
+- Generation is currently unlimited; there is no quota to deduct. If one is reintroduced, read-and-decrement it with `SELECT ... FOR UPDATE` (SQLAlchemy: `.with_for_update()`) so concurrent requests cannot double-spend it.
+- Always `commit()` before dispatching a Celery task: the worker runs in another process and must see the committed row.
 
 ### 6. Cost Logging
 
@@ -130,7 +130,7 @@ app/
 
 - Catch specific exception types. Never use a bare `except Exception` without re-raising or logging.
 - Raise `fastapi.HTTPException` with appropriate status codes. Never let raw SQLAlchemy or database errors propagate to the HTTP response.
-- Use the custom exception classes in `core/exceptions.py` for domain-level errors (e.g., `QuotaExceededError`, `DocumentNotFoundError`).
+- Use the custom exception classes in `core/exceptions.py` for domain-level errors (e.g., `DocumentNotFoundError`, `InvalidStateError`); `app/main.py` maps them to HTTP status codes.
 
 ### 9. Configuration
 

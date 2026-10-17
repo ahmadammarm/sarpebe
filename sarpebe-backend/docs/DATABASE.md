@@ -25,8 +25,10 @@ erDiagram
     curriculum_documents {
         uuid id PK
         varchar title
-        varchar document_type "CP, ATP, Buku Guru"
+        varchar document_type "CP, ATP, BUKU_GURU"
         varchar url_path "Storage path to PDF"
+        varchar grade_level "Normalized label"
+        varchar subject "Normalized label"
         timestamp uploaded_at
     }
 
@@ -47,7 +49,8 @@ erDiagram
         varchar subject
         varchar topic
         jsonb generated_content "Denormalized lesson structure"
-        varchar status "pending, completed, failed"
+        varchar status "pending, processing, completed, failed"
+        varchar job_id "Celery task id (indexed)"
         timestamp created_at
     }
 
@@ -73,7 +76,7 @@ erDiagram
 - `id` (UUID, PK): Maps to `auth.users.id`. `ON DELETE CASCADE`.
 - `full_name` (VARCHAR): User's displayed full name.
 - `school_name` (VARCHAR): The institution the user belongs to.
-- `subscription_tier` (VARCHAR): 'free' or 'premium' for quota management.
+- `subscription_tier` (VARCHAR): 'free' or 'premium'. Currently informational; no quota is enforced.
 - `created_at` (TIMESTAMP): Record creation timestamp.
 
 ### 2. `curriculum_documents`
@@ -82,7 +85,9 @@ erDiagram
 **Columns:**
 - `id` (UUID, PK): Unique identifier.
 - `title` (VARCHAR): Official name (e.g., "CP Matematika Fase A").
-- `document_type` (VARCHAR): Category ("CP", "ATP", "Buku Guru").
+- `document_type` (VARCHAR): Category ("CP", "ATP", "BUKU_GURU").
+- `grade_level` / `subject` (VARCHAR, nullable): Normalized labels (see `app/utils/labels.py`) the document was ingested under.
+- `status` (VARCHAR): 'processing', 'completed' or 'failed'.
 - `url_path` (VARCHAR): Storage path in Supabase Storage.
 - `uploaded_at` (TIMESTAMP): Ingestion timestamp.
 
@@ -95,8 +100,8 @@ erDiagram
 - `chunk_content` (TEXT): The extracted text used for LLM context.
 - `embedding` (VECTOR): 768-dimensional vector using Gemini Embeddings.
 - `page_number` (INT): Used for LLM citations.
-- `grade_level` (VARCHAR): Denormalized for fast SQL pre-filtering.
-- `subject` (VARCHAR): Denormalized for fast SQL pre-filtering.
+- `grade_level` (VARCHAR): Denormalized, stored in normalized form (trimmed, case-folded) for exact SQL pre-filtering.
+- `subject` (VARCHAR): Denormalized, stored in normalized form for exact SQL pre-filtering.
 
 ### 4. `lesson_plans`
 **Purpose:** Stores generated lesson plan drafts linked to the user.
@@ -108,7 +113,8 @@ erDiagram
 - `subject` (VARCHAR): Target subject.
 - `topic` (VARCHAR): Specific topic.
 - `generated_content` (JSONB): The full LLM structured output.
-- `status` (VARCHAR): Tracks generation ('pending', 'completed', 'failed').
+- `status` (VARCHAR): Tracks generation ('pending', 'processing', 'completed', 'failed'). This row is the source of truth for job status.
+- `job_id` (VARCHAR, indexed): The Celery task id; used to look up a plan from `/lesson-plans/jobs/{job_id}`, scoped to its owner.
 - `created_at` (TIMESTAMP): Request timestamp.
 
 ### 5. `llm_cost_logs`
@@ -162,12 +168,12 @@ To ensure system stability, prevent race conditions, and maintain high performan
 - **Implementation:** Always use SQLAlchemy's eager loading options (`joinedload` for many-to-one, `selectinload` for one-to-many collections) when writing `SELECT` queries in the Repository layer.
 
 ### 2. Transactions and ACID Compliance
-- **Context:** The RAG generation process involves multiple interdependent database writes (saving the generated draft, deducting the user's quota, and inserting a token cost log). If the process crashes halfway, the database must not be left in a corrupted or partially-billed state.
+- **Context:** The RAG generation process involves multiple interdependent database writes (saving the generated draft and creating the job record). If the process crashes halfway, the database must not be left in a corrupted or partially-billed state.
 - **Rule:** Multi-step write operations must be executed atomically within a single transaction block.
 - **Implementation:** Use SQLAlchemy's transaction context managers (e.g., `async with session.begin():`). If any step raises an exception, the database will automatically execute a `ROLLBACK`. Only upon successful completion of the block will it `COMMIT`.
 
 ### 3. Concurrency and Row-Level Locking (Pessimistic Locking)
-- **Context:** In a multi-user environment, a user might double-click a "Generate" button. If they only have 1 generation quota left, a race condition could allow both requests to read "1 remaining" simultaneously, bypassing the limit.
+- **Context:** In a multi-user environment, a user might double-click a "Generate" button. If a limit such as a quota were enforced, a race condition could allow both requests to read "1 remaining" simultaneously, bypassing it. (Generation is currently unlimited, so this rule applies only if a limit is reintroduced.)
 - **Rule:** When reading and modifying state subject to concurrent limits (like user quotas, token balances, or subscription state), you must lock the row.
 - **Implementation:** Use `SELECT ... FOR UPDATE` (via SQLAlchemy's `with_for_update()` method) when fetching the profile/quota record. This places a row-level lock in PostgreSQL, forcing any concurrent transaction attempting to read that same row for an update to wait until the first transaction completes.
 

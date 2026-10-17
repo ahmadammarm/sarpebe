@@ -119,8 +119,8 @@ Gemini API calls take 10–30 seconds. Routers immediately return `202 Accepted`
 **RAG Pre-Filtering**
 Vector similarity search is always preceded by a SQL `WHERE` clause filtering by `grade_level` and `subject`. This avoids computing cosine distances across the entire embedding table and keeps search accurate and fast as the dataset scales.
 
-**Pessimistic Locking for Quotas**
-When checking and decrementing a user's generation quota, the repository uses `SELECT ... FOR UPDATE` (`with_for_update()`) to prevent race conditions from concurrent requests double-spending quota.
+**Commit Before Dispatch**
+Celery tasks are dispatched only after the lesson plan / document row is committed, so the worker never races the request transaction. Job status is read from the database row rather than Celery's result backend.
 
 **Connection Pooling**
 In production, the app connects to Supabase via the Supavisor connection pooler (port 6543, transaction mode) rather than directly to PostgreSQL. SQLAlchemy's `pool_size` and `max_overflow` are tuned to match the pooler's capacity.
