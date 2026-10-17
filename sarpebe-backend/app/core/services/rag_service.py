@@ -18,7 +18,7 @@ class RAGService:
         1. Embeds the topic query.
         2. Retrieves the most relevant chunks, strictly pre-filtered by grade and subject.
         """
-        embedding = await embedding_service.embed_text(db, topic, user_id)
+        embedding = await embedding_service.embed_text(topic, user_id)
         
         chunks = await document_chunk_repo.search_similar(
             db=db,

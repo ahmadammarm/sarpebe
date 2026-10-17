@@ -43,4 +43,13 @@ class LessonPlanRepository(BaseRepository[LessonPlan, LessonPlanCreate, dict]):
         )
         return result.scalar_one_or_none()
 
+    async def get_by_job_id_and_user(self, db: AsyncSession, job_id: str, user_id: UUID | str) -> LessonPlan | None:
+        """
+        Fetches the lesson plan created for a generation job, ensuring the user owns it.
+        """
+        result = await db.execute(
+            select(self.model).filter(self.model.job_id == job_id, self.model.user_id == user_id)
+        )
+        return result.scalar_one_or_none()
+
 lesson_plan_repo = LessonPlanRepository()

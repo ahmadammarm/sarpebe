@@ -4,6 +4,7 @@ from sqlalchemy import String, Integer, Numeric, TIMESTAMP, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from app.db.base import Base
+from app.utils.time import utc_now
 
 class LLMCostLog(Base):
     __tablename__ = "llm_cost_logs"
@@ -15,7 +16,7 @@ class LLMCostLog(Base):
     prompt_tokens: Mapped[int] = mapped_column(Integer, default=0)
     completion_tokens: Mapped[int] = mapped_column(Integer, default=0)
     total_cost: Mapped[float] = mapped_column(Numeric(10, 6), default=0.0)
-    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=utc_now)
 
     # Relationships
     user: Mapped["Profile"] = relationship("Profile", back_populates="llm_cost_logs")

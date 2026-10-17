@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from app.db.models.document_chunk import DocumentChunk
 from app.db.repositories.base_repository import BaseRepository
+from app.utils.labels import normalize_label
 
 class DocumentChunkRepository(BaseRepository[DocumentChunk, dict, dict]):
     def __init__(self):
@@ -22,6 +23,9 @@ class DocumentChunkRepository(BaseRepository[DocumentChunk, dict, dict]):
         Crucially, it PRE-FILTERS by grade_level and subject using standard B-Tree
         indexes before computing the math-heavy vector distances.
         
+        Labels are compared in their normalized form (see app.utils.labels), which is also
+        how chunks are stored at ingestion time.
+
         Uses joinedload() to eagerly load the parent CurriculumDocument metadata,
         preventing N+1 query issues.
         """
@@ -29,8 +33,8 @@ class DocumentChunkRepository(BaseRepository[DocumentChunk, dict, dict]):
             select(self.model)
             .options(joinedload(self.model.document))
             .filter(
-                self.model.grade_level == grade_level,
-                self.model.subject == subject
+                self.model.grade_level == normalize_label(grade_level),
+                self.model.subject == normalize_label(subject)
             )
             .order_by(self.model.embedding.cosine_distance(embedding))
             .limit(top_k)

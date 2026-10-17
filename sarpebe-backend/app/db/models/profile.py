@@ -4,6 +4,7 @@ from sqlalchemy import String, TIMESTAMP
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from app.db.base import Base
+from app.utils.time import utc_now
 
 class Profile(Base):
     __tablename__ = "profiles"
@@ -13,7 +14,7 @@ class Profile(Base):
     school_name: Mapped[str | None] = mapped_column(String, nullable=True)
     subscription_tier: Mapped[str] = mapped_column(String, default="free")
     role: Mapped[str] = mapped_column(String, default="user", nullable=False)
-    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=utc_now)
 
     # Relationships
     lesson_plans: Mapped[list["LessonPlan"]] = relationship("LessonPlan", back_populates="user", cascade="all, delete-orphan")

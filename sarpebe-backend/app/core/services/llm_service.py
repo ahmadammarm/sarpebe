@@ -1,16 +1,14 @@
 import json
 from uuid import UUID
 from typing import Any
-from sqlalchemy.ext.asyncio import AsyncSession
 from google import genai
 from google.genai import types
 from tenacity import retry, stop_after_attempt, wait_exponential
 from pydantic import BaseModel, Field
 
 from app.config import settings
-from app.db.models.llm_cost_log import LLMCostLog
+from app.core.services.cost_logging import log_cost
 from app.db.models.document_chunk import DocumentChunk
-from app.utils.cost_calculator import calculate_cost
 
 client = genai.Client(api_key=settings.gemini_api_key)
 
@@ -30,7 +28,6 @@ class LLMService:
         reraise=True
     )
     async def generate_lesson_plan(
-        db: AsyncSession,
         context_chunks: list[DocumentChunk],
         grade_level: str,
         subject: str,
@@ -97,19 +94,15 @@ class LLMService:
         usage = response.usage_metadata
         prompt_tokens = usage.prompt_token_count if usage else 0
         comp_tokens = usage.candidates_token_count if usage else 0
-        cost = calculate_cost(settings.gemini_generation_model, prompt_tokens, comp_tokens)
-        
-        cost_log = LLMCostLog(
+        await log_cost(
+            model_name=settings.gemini_generation_model,
+            operation_type="generation",
             user_id=user_id,
             lesson_plan_id=lesson_plan_id,
-            operation_type="generation",
             prompt_tokens=prompt_tokens,
             completion_tokens=comp_tokens,
-            total_cost=cost
         )
-        db.add(cost_log)
-        await db.flush()
-        
+
         try:
             return json.loads(response.text)
         except Exception:
