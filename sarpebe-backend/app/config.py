@@ -10,9 +10,33 @@ class Settings(BaseSettings):
     gemini_api_key: str
     gemini_embedding_model: str = "gemini-embedding-2"
     gemini_generation_model: str = "gemini-3.8-flash"
+    gemini_rerank_model: str = "gemini-2.5-flash-lite"
+    # Only used by the offline evaluations (python -m evals.run generation --judge).
+    gemini_judge_model: str = "gemini-3.8-flash"
     redis_url: str
     cors_origins: list[str] = ["http://localhost:3000"]
     max_upload_mb: int = 20
+
+    # Retrieval (RAG). The similarity floor is calibrated with `python -m evals.run retrieval`.
+    rag_candidate_k: int = 20
+    rag_top_k: int = 6
+    rag_rerank_shortlist: int = 12  # candidates sent to the reranker
+    rag_min_similarity: float = 0.45
+    rag_context_max_chars: int = 14000
+    rag_use_rerank: bool = True
+    # Send RETRIEVAL_DOCUMENT / RETRIEVAL_QUERY task types. gemini-embedding-2 may ignore them,
+    # so this stays off until `python -m evals.run retrieval` shows a gain.
+    embedding_use_task_types: bool = False
+    # Pin HNSW's iterative scan (pgvector >= 0.8) so filtered searches still return enough rows.
+    rag_hnsw_iterative_scan: bool = True
+
+    # Generation. None for temperature = use the model default.
+    generation_temperature: float | None = None
+    generation_thinking_level: Literal["MINIMAL", "LOW", "MEDIUM", "HIGH"] | None = "MEDIUM"
+    generation_max_output_tokens: int = 16000
+    prompt_version: str = "lesson_plan.v2"
+    # Attempts per model call for transient errors (429, 5xx, timeouts) only.
+    llm_max_attempts: int = 3
 
     # Authentication
     auth_jwt_secret: str = Field(min_length=32)

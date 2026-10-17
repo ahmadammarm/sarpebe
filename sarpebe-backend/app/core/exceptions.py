@@ -50,3 +50,23 @@ class InvalidRefreshTokenError(AppError):
 class InvalidEmailTokenError(AppError):
     """Raised when an email verification or password reset token is unusable."""
     code = "invalid_email_token"
+
+class TransientLLMError(AppError):
+    """Raised when the model API stays unavailable (429, 5xx, timeout) after the allowed attempts."""
+    code = "llm_unavailable"
+
+class LLMOutputError(AppError):
+    """Raised when the model's output is unusable even after one repair attempt."""
+    code = "llm_output_invalid"
+
+class ContentBlockedError(AppError):
+    """Raised when the model refuses or the response is blocked (safety, recitation)."""
+    code = "content_blocked"
+
+class InsufficientContextError(AppError):
+    """Raised when the indexed documents do not cover the requested topic well enough."""
+    code = "insufficient_context"
+
+class InvalidContentError(AppError):
+    """Raised when edited lesson plan content does not match its schema."""
+    code = "invalid_content"

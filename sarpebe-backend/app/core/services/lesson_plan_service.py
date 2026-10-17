@@ -2,13 +2,17 @@ import asyncio
 import uuid
 from datetime import timedelta
 from typing import AsyncIterator, Any, Sequence
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import InvalidStateError, LessonPlanNotFoundError
+from app.config import settings
+from app.core.exceptions import InvalidContentError, InvalidStateError, LessonPlanNotFoundError
 from app.db.models.lesson_plan import LessonPlan
 from app.db.repositories.lesson_plan_repository import lesson_plan_repo
 from app.db.session import AsyncSessionLocal
 from app.schemas.lesson_plan import JobStatusResponse, LessonPlanCreate
+from app.schemas.lesson_plan_content import SCHEMA_VERSION, ModulContent
+from app.utils.modul_pdf import generate_modul_pdf
 from app.utils.pdf_generator import generate_lesson_plan_pdf
 from app.utils.time import utc_now
 
@@ -30,6 +34,14 @@ class LessonPlanService:
             "topic": payload.topic,
             "status": "pending",
             "job_id": job_id,
+            "request_options": {
+                "meeting_count": payload.meeting_count,
+                "minutes_per_meeting": payload.minutes_per_meeting,
+                "teaching_model": payload.teaching_model.value,
+                "class_notes": payload.class_notes,
+            },
+            "prompt_version": settings.prompt_version,
+            "model_name": settings.gemini_generation_model,
         })
         # Commit before dispatch so the worker is guaranteed to see the row.
         # (Explicit commit rather than session.begin(): the request session has already autobegun.)
@@ -56,6 +68,16 @@ class LessonPlanService:
         plan = await LessonPlanService.get_plan(db, plan_id, user_id)
         if plan.status != "completed":
             raise InvalidStateError("Only completed lesson plans can be edited.")
+
+        if plan.schema_version == SCHEMA_VERSION:
+            # A saved edit must still be a valid module (e.g. a table cannot lose a column).
+            try:
+                content = ModulContent.model_validate(content).model_dump(mode="json")
+            except ValidationError as error:
+                first = error.errors()[0]
+                where = ".".join(str(part) for part in first["loc"])
+                raise InvalidContentError(f"Isi modul tidak sesuai format ({where}: {first['msg']}).") from error
+
         plan = await lesson_plan_repo.update(db, plan, {"generated_content": content})
         await db.commit()
         return plan
@@ -72,14 +94,17 @@ class LessonPlanService:
         if plan.status != "completed" or not plan.generated_content:
             raise InvalidStateError("Lesson plan is not completed yet or has no content to export.")
 
-        pdf_bytes = generate_lesson_plan_pdf(
-            plan_metadata={
-                "grade_level": plan.grade_level,
-                "subject": plan.subject,
-                "topic": plan.topic,
-            },
-            content=plan.generated_content,
-        )
+        if plan.schema_version == SCHEMA_VERSION:
+            pdf_bytes = generate_modul_pdf(ModulContent.model_validate(plan.generated_content))
+        else:
+            pdf_bytes = generate_lesson_plan_pdf(
+                plan_metadata={
+                    "grade_level": plan.grade_level,
+                    "subject": plan.subject,
+                    "topic": plan.topic,
+                },
+                content=plan.generated_content,
+            )
         filename = f"Modul_Ajar_{plan.topic.replace(' ', '_')}.pdf"
         return pdf_bytes, filename
 
@@ -94,14 +119,17 @@ class LessonPlanService:
             raise LessonPlanNotFoundError("Job not found")
 
         status = plan.status
+        stage = None
         error = None
         if status == "failed" and plan.generated_content:
             error = plan.generated_content.get("error")
         elif status not in TERMINAL_STATUSES and utc_now() - plan.created_at > STALE_AFTER:
             status = "failed"
             error = "Pembuatan modul ajar melebihi batas waktu."
+        elif status == "processing" and plan.generation_meta:
+            stage = plan.generation_meta.get("stage")
 
-        return JobStatusResponse(job_id=job_id, status=status, lesson_plan_id=plan.id, error=error)
+        return JobStatusResponse(job_id=job_id, status=status, stage=stage, lesson_plan_id=plan.id, error=error)
 
     @staticmethod
     async def stream_job_status(job_id: str, user_id: uuid.UUID) -> AsyncIterator[JobStatusResponse]:
