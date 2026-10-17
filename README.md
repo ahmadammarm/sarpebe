@@ -1,13 +1,13 @@
 # SARPEBE
 **Sistem Automasi Rencana Pembelajaran Berbasis Kurikulum**
 
-SARPEBE is an educational platform that automates the generation of curriculum-aligned lesson plans for Indonesian educators. It leverages Retrieval-Augmented Generation (RAG) powered by Google Gemini to produce structured lesson plans grounded strictly in official curriculum documents (Capaian Pembelajaran, ATP, and Buku Guru), with zero hallucinations.
+SARPEBE is an educational platform that automates the generation of curriculum-aligned lesson plans for Indonesian educators. It leverages Retrieval-Augmented Generation (RAG) powered by Google Gemini to produce structured lesson plans grounded strictly in official curriculum documents (Capaian Pembelajaran, ATP, and Buku Guru), with every objective traceable to its source page.
 
 ---
 
 ## Overview
 
-Traditional lesson plan creation is time-consuming and often inconsistent with the latest curriculum standards. SARPEBE solves this by allowing educators to specify a grade level, subject, and topic, then automatically generating a complete, standards-compliant lesson plan in the background — fully cited from uploaded official documents.
+Traditional lesson plan creation is time-consuming and often inconsistent with the latest curriculum standards. SARPEBE solves this by allowing educators to specify a grade level, subject, and topic, then automatically generating a complete Modul Ajar (general information, learning objectives, per-meeting activity tables, assessment with rubric, enrichment and remedial, reflection, worksheet, reading material and glossary) in the background, with references taken from the uploaded official documents.
 
 ---
 
@@ -48,7 +48,7 @@ Repository Layer (Database Queries, pgvector Search)
 Supabase (PostgreSQL + pgvector + Storage)
 ```
 
-Long-running AI generation requests are offloaded to Celery background workers, keeping the API non-blocking. The frontend polls job status until completion.
+Long-running AI generation requests are offloaded to Celery background workers, keeping the API non-blocking. The frontend follows the job over Server-Sent Events and falls back to polling.
 
 ---
 
@@ -59,8 +59,8 @@ Long-running AI generation requests are offloaded to Celery background workers, 
 | Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS |
 | Backend API | FastAPI, Python 3.11+ |
 | Database | Supabase (PostgreSQL) |
-| Vector Search | pgvector (HNSW index) |
-| AI Engine | Google Gemini API (Pro / Flash + Text Embeddings) |
+| Search | pgvector (HNSW) + PostgreSQL Indonesian full-text search, fused by reciprocal rank fusion |
+| AI Engine | Google Gemini API (structured generation, small-model rerank, embeddings) |
 | Background Tasks | Celery + Redis |
 | ORM & Migrations | SQLAlchemy 2.0 + Alembic |
 | Auth | Backend-issued JWT access tokens + rotating refresh tokens (bcrypt passwords, `/api/auth/*`) |
@@ -70,10 +70,13 @@ Long-running AI generation requests are offloaded to Celery background workers, 
 ## Core Features
 
 **Curriculum-Grounded Generation**
-Lesson plans are generated using RAG. The system retrieves the most semantically relevant chunks from official curriculum documents before sending context to Gemini, ensuring every output is traceable and cited.
+Lesson plans are generated using RAG. PDFs are read with table-aware extraction; retrieval combines vector and keyword search, drops weak matches and reranks the rest. If the documents do not cover the topic, generation stops instead of inventing content. References are built by the server from the passages the model used, so a citation cannot be fabricated. The output is checked (table shape, minutes per meeting, source ids) and repaired once if needed.
+
+**Measured Quality**
+Offline evaluations (`python -m evals.run`) report retrieval hit rate and the right similarity floor, plus schema-valid, repair and grounding rates for real generations. Prompt and schema changes are versioned and compared against them. See [AI pipeline](sarpebe-backend/docs/AI.md).
 
 **Asynchronous Processing**
-AI generation can take 10–30 seconds. The API immediately returns `202 Accepted` with a `job_id`. A Celery worker handles the generation in the background. The frontend polls the job status endpoint until the plan is ready.
+AI generation takes about 20–60 seconds. The API immediately returns `202 Accepted` with a `job_id`. A Celery worker handles the generation in the background and records its stage (retrieving, drafting, repairing). The frontend follows the job until the plan is ready.
 
 **Cost Observability**
 Every call to the Gemini API records `prompt_tokens`, `completion_tokens`, and the calculated fiat cost to the database, enabling usage and cost analytics.
@@ -95,4 +98,5 @@ Refer to the individual README files for setup instructions:
 ## Documentation
 
 - [Backend Engineering Directives](sarpebe-backend/AGENTS.md)
+- [AI Pipeline: RAG, prompts, evaluations](sarpebe-backend/docs/AI.md)
 - [Database Schema & Architecture](sarpebe-backend/docs/DATABASE.md)

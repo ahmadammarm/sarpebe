@@ -116,7 +116,7 @@ Routers handle HTTP concerns only (validation, auth injection, response formatti
 ## Key Engineering Decisions
 
 **Async LLM Processing**
-Gemini API calls take 10–30 seconds. Routers immediately return `202 Accepted` with a `job_id`. Celery workers execute the RAG pipeline and generation in the background. Clients poll the job status endpoint until the result is ready.
+Generation takes about 20–60 seconds. Routers immediately return `202 Accepted` with a `job_id`. Celery workers execute the RAG pipeline and generation in the background. Clients follow the job status (SSE, or polling) until the result is ready.
 
 **RAG Pre-Filtering and Hybrid Retrieval**
 Every search is preceded by a SQL `WHERE` clause filtering by `grade_level` and `subject`. Within that set, vector and Indonesian full-text candidates are fused (reciprocal rank fusion), cut by a similarity floor, and reranked by a small model. If nothing is relevant the job stops before any generation call. See [docs/AI.md](docs/AI.md) for the whole pipeline, prompts, and how to evaluate changes.

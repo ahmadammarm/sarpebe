@@ -178,6 +178,9 @@ sarpebe-frontend/
 ## DRY Conventions
 
 - `lib/api/client.ts` is the single HTTP client. Auth headers, base URL, and error handling are defined once. Never duplicate them.
+- Lesson plans come in two shapes, told apart by `schema_version` (1 short format, 2 full Modul Ajar with `Table`s, `references` and `warnings`). `app/(dashboard)/lesson-plans/[id]/page.tsx` picks `LessonPlanEditor` or `LessonPlanEditorV2` from it; keep old plans working. v2 types mirror `app/schemas/lesson_plan_content.py`.
+- Tables are edited with `components/ui/editable-table.tsx` (real table from `sm`, one card per row below it, fixed columns because the backend validates cell counts per row). Citations are shown from the server-built `references`, never typed in by the user.
+- `GenerationProgress` follows the real `stage` the backend reports (retrieving, drafting, repairing).
 - `types/` is the single source of truth for all data shapes. Import from `types/` — never redeclare an interface inline in a component or hook.
 - `lib/utils/formatters.ts` is the single place for all display formatting (dates, numbers, token counts, currency). Never format inline in a component.
 - `lib/utils/validators.ts` is the single place for Zod schemas. The same schema is used for the form type, client-side validation, and (optionally) validating the API response.

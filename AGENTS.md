@@ -6,7 +6,7 @@ This file provides AI coding agents with context, rules, and conventions for wor
 
 ## Project Overview
 
-SARPEBE (Sistem Automasi Rencana Pembelajaran Berbasis Kurikulum) is an educational platform that automates curriculum-aligned lesson plan generation for Indonesian educators. It uses Retrieval-Augmented Generation (RAG) powered by Google Gemini, grounded strictly on official curriculum documents.
+SARPEBE (Sistem Automasi Rencana Pembelajaran Berbasis Kurikulum) is an educational platform that automates curriculum-aligned lesson plan generation for Indonesian educators. It uses Retrieval-Augmented Generation (RAG) powered by Google Gemini, grounded on official curriculum documents. Any change to a prompt, schema or retrieval setting follows the process in `sarpebe-backend/docs/AI.md` (bump `PROMPT_VERSION`, run the evals, compare).
 
 ---
 
@@ -29,7 +29,7 @@ Each application is fully independent. They communicate over HTTP only. Do not c
 - Never add shared source code, utilities, or configuration at the root level. Each application owns its own dependencies, types, and config.
 - All changes to the frontend must be scoped to `sarpebe-frontend/`.
 - All changes to the backend must be scoped to `sarpebe-backend/`.
-- README files exist at the root, in `sarpebe-frontend/`, and in `sarpebe-backend/`. Keep all three up to date when making structural changes.
+- README files exist at the root, in `sarpebe-frontend/`, and in `sarpebe-backend/`, plus `sarpebe-backend/docs/`. Keep them, this file and `CLAUDE.md` (the copy in `.claude/` must match the root one) up to date when making structural changes.
 
 ---
 
@@ -80,6 +80,8 @@ refactor(backend): extract cost calculation into utility module
 - Do not write business logic inside routers (backend) or pages (frontend).
 - Do not use `any` as a TypeScript type without a documented justification.
 - Do not swallow exceptions silently — always log or re-raise with context.
+- Do not commit generated evaluation data or reports (`evals/data/*.jsonl`, `evals/reports/`).
+- Do not trust model output: validate it against the Pydantic schema and never display citations the model wrote itself.
 
 ---
 

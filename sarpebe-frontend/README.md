@@ -55,7 +55,9 @@ sarpebe-frontend/
 │       ├── lesson-plans/
 │       │   ├── LessonPlanCard.tsx
 │       │   ├── LessonPlanList.tsx
-│       │   └── GenerateForm.tsx
+│       │   ├── LessonPlanEditor.tsx    # schema_version 1 plans
+│       │   ├── LessonPlanEditorV2.tsx  # full Modul Ajar with editable tables
+│       │   └── GenerationProgress.tsx  # real backend stages
 │       └── curriculum/
 │           └── DocumentUploader.tsx
 │
