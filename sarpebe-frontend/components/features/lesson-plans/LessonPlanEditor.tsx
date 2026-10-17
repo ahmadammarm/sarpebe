@@ -142,8 +142,16 @@ export function LessonPlanEditor({ plan }: LessonPlanEditorProps) {
       </div>
 
       <div aria-live="polite" className="min-h-6 text-sm">
-        {dirty && <span className="font-medium text-margin-text">Ada perubahan yang belum disimpan.</span>}
-        {!dirty && justSaved && <span className="font-medium text-tick">Perubahan tersimpan.</span>}
+        {dirty && (
+          <span className="animate-in fade-in slide-in-from-bottom-1 font-medium text-margin-text duration-200">
+            Ada perubahan yang belum disimpan.
+          </span>
+        )}
+        {!dirty && justSaved && (
+          <span className="animate-in fade-in slide-in-from-bottom-1 font-medium text-tick duration-200">
+            Perubahan tersimpan.
+          </span>
+        )}
       </div>
 
       {errorMsg && (
@@ -181,7 +189,10 @@ export function LessonPlanEditor({ plan }: LessonPlanEditorProps) {
         <Section id="kegiatan" title="Kegiatan pembelajaran" help="Isi lama kegiatan dan apa yang dilakukan.">
           <ul className="space-y-4">
             {(content.activities ?? []).map((activity, index) => (
-              <li key={index} className="grid gap-3 sm:grid-cols-[9rem_minmax(0,1fr)_auto] sm:items-start">
+              <li
+                key={index}
+                className="grid gap-3 animate-in fade-in slide-in-from-top-1 duration-200 sm:grid-cols-[9rem_minmax(0,1fr)_auto] sm:items-start"
+              >
                 <div>
                   <Label htmlFor={`activity-duration-${index}`} className="mb-1.5">
                     Durasi
@@ -264,7 +275,9 @@ export function LessonPlanEditor({ plan }: LessonPlanEditorProps) {
               <ul className="space-y-2">
                 {citations.map((citation, index) => (
                   <li key={index} className="leading-7">
-                    <Mark>{citation}</Mark>
+                    <Mark draw="view" delay={index * 140}>
+                      {citation}
+                    </Mark>
                   </li>
                 ))}
               </ul>

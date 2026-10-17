@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { FaseTag } from "@/components/brand/FaseTag";
 import { Mark } from "@/components/brand/Mark";
+import { Reveal } from "@/components/brand/Reveal";
 import { Sheet } from "@/components/brand/Sheet";
 import { ThemeToggle } from "@/components/brand/ThemeToggle";
 import { Wordmark } from "@/components/brand/Wordmark";
@@ -36,6 +37,17 @@ const TRUST_POINTS = [
   },
 ];
 
+const ADMIN_POINTS = [
+  "Unggah PDF Capaian Pembelajaran, Alur Tujuan Pembelajaran, atau Buku Guru.",
+  "Tentukan kelas dan mata pelajaran yang dicakup setiap dokumen.",
+  "Pantau pengindeksan: memproses, terindeks, atau gagal.",
+];
+
+/** Staggers an element's entrance on page load (see .rise in globals.css). */
+function delay(ms: number): React.CSSProperties {
+  return { "--delay": `${ms}ms` } as React.CSSProperties;
+}
+
 export default function Home() {
   return (
     <div className="flex min-h-screen flex-col">
@@ -57,20 +69,26 @@ export default function Home() {
       </header>
 
       <main className="flex-1">
-        {/* Hero: the product's promise, next to what it produces. */}
+        {/* Hero: the product's promise, next to what it produces. Enters in sequence on load. */}
         <section className="ruled-page border-b border-rule">
           <div className="mx-auto grid w-full max-w-6xl gap-12 px-5 py-14 sm:px-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)] lg:items-center lg:py-20">
             <div>
-              <p className="font-hand text-2xl text-ink-soft">untuk guru Kurikulum Merdeka</p>
-              <h1 className="mt-2 text-4xl font-bold leading-[1.08] sm:text-5xl lg:text-6xl">
-                Susun modul ajar dari <Mark>Capaian Pembelajaran</Mark> yang resmi.
+              <p className="rise font-hand text-2xl text-ink-soft" style={delay(0)}>
+                untuk guru Kurikulum Merdeka
+              </p>
+              <h1 className="rise mt-2 text-4xl font-bold leading-[1.08] sm:text-5xl lg:text-6xl" style={delay(90)}>
+                Susun modul ajar dari{" "}
+                <Mark draw="load" delay={800}>
+                  Capaian Pembelajaran
+                </Mark>{" "}
+                yang resmi.
               </h1>
-              <p className="mt-6 max-w-xl text-lg text-ink-soft">
+              <p className="rise mt-6 max-w-xl text-lg text-ink-soft" style={delay(200)}>
                 Pilih kelas, mata pelajaran, dan topik. SARPEBE membaca dokumen CP yang diunggah administrator,
                 menyusun draf modul ajar, lalu mencantumkan halaman rujukannya. Anda tinggal menyunting dan
                 mengunduh PDF.
               </p>
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <div className="rise mt-8 flex flex-col gap-3 sm:flex-row" style={delay(310)}>
                 <Link href="/register" className={buttonVariants({ size: "lg" })}>
                   Buat akun
                 </Link>
@@ -80,7 +98,7 @@ export default function Home() {
               </div>
             </div>
 
-            <figure>
+            <figure className="rise" style={delay(260)}>
               <figcaption className="mb-2 font-hand text-xl text-ink-soft">Contoh hasil</figcaption>
               <Sheet margin className="py-6 pr-5 sm:pr-8">
                 <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -92,14 +110,19 @@ export default function Home() {
 
                 <h3 className="mt-6 text-sm font-semibold uppercase tracking-wide text-ink-soft">Tujuan pembelajaran</h3>
                 <p className="mt-2 leading-7">
-                  Peserta didik mampu <Mark>menganalisis interaksi antarpelaku ekonomi</Mark> dalam kegiatan
-                  produksi, distribusi, dan konsumsi.
+                  Peserta didik mampu{" "}
+                  <Mark draw="load" delay={1150}>
+                    menganalisis interaksi antarpelaku ekonomi
+                  </Mark>{" "}
+                  dalam kegiatan produksi, distribusi, dan konsumsi.
                 </p>
                 <p className="mt-1 font-hand text-lg text-margin-text">kutipan dari CP, halaman 14</p>
 
                 <h3 className="mt-6 text-sm font-semibold uppercase tracking-wide text-ink-soft">Sumber rujukan</h3>
                 <p className="mt-2 text-sm">
-                  <Mark>Dokumen CP IPS, hlm. 14</Mark>
+                  <Mark draw="load" delay={1500}>
+                    Dokumen CP IPS, hlm. 14
+                  </Mark>
                 </p>
               </Sheet>
             </figure>
@@ -108,16 +131,23 @@ export default function Home() {
 
         {/* How it works: a real sequence, so the numbers carry information. */}
         <section aria-labelledby="cara-kerja" className="mx-auto w-full max-w-6xl px-5 py-16 sm:px-8 lg:py-24">
-          <h2 id="cara-kerja" className="max-w-2xl text-3xl font-bold sm:text-4xl">
-            Tiga langkah, tanpa mulai dari halaman kosong.
-          </h2>
+          <Reveal>
+            <h2 id="cara-kerja" className="max-w-2xl text-3xl font-bold sm:text-4xl">
+              Tiga langkah, tanpa mulai dari halaman kosong.
+            </h2>
+          </Reveal>
           <ol className="mt-10 divide-y divide-rule border-y border-rule">
             {STEPS.map((step, index) => (
-              <li key={step.title} className="grid gap-2 py-6 sm:grid-cols-[5rem_minmax(0,1fr)_minmax(0,1.3fr)] sm:items-baseline sm:gap-8">
+              <Reveal
+                as="li"
+                key={step.title}
+                delay={index * 100}
+                className="grid gap-2 py-6 sm:grid-cols-[5rem_minmax(0,1fr)_minmax(0,1.3fr)] sm:items-baseline sm:gap-8"
+              >
                 <span aria-hidden className="font-hand text-5xl leading-none text-ballpoint">{index + 1}</span>
                 <h3 className="text-xl font-semibold">{step.title}</h3>
                 <p className="text-ink-soft">{step.body}</p>
-              </li>
+              </Reveal>
             ))}
           </ol>
         </section>
@@ -125,22 +155,25 @@ export default function Home() {
         {/* Why it can be reviewed. */}
         <section aria-labelledby="dapat-ditinjau" className="border-y border-rule bg-sheet">
           <div className="mx-auto grid w-full max-w-6xl gap-10 px-5 py-16 sm:px-8 lg:grid-cols-2 lg:py-24">
-            <div>
+            <Reveal>
               <h2 id="dapat-ditinjau" className="text-3xl font-bold sm:text-4xl">
                 Setiap modul menyebut sumbernya.
               </h2>
               <p className="mt-5 max-w-lg text-lg text-ink-soft">
                 Kepala sekolah atau pengawas bisa memeriksa dari mana sebuah tujuan pembelajaran berasal.
-                Rujukan ditampilkan sebagai nama dokumen dan halaman, ditandai seperti stabilo di bagian
-                Sumber rujukan.
+                Rujukan ditampilkan sebagai nama dokumen dan halaman, ditandai seperti stabilo di bagian{" "}
+                <Mark draw="view" delay={300}>
+                  Sumber rujukan
+                </Mark>
+                .
               </p>
-            </div>
+            </Reveal>
             <dl className="divide-y divide-rule border-y border-rule">
-              {TRUST_POINTS.map((point) => (
-                <div key={point.term} className="py-5">
+              {TRUST_POINTS.map((point, index) => (
+                <Reveal key={point.term} delay={index * 100} className="py-5">
                   <dt className="text-lg font-semibold">{point.term}</dt>
                   <dd className="mt-1 text-ink-soft">{point.detail}</dd>
-                </div>
+                </Reveal>
               ))}
             </dl>
           </div>
@@ -149,7 +182,7 @@ export default function Home() {
         {/* Administrators. */}
         <section aria-labelledby="administrator" className="mx-auto w-full max-w-6xl px-5 py-16 sm:px-8 lg:py-24">
           <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
-            <div>
+            <Reveal>
               <h2 id="administrator" className="text-3xl font-bold sm:text-4xl">
                 Untuk administrator kurikulum
               </h2>
@@ -160,31 +193,25 @@ export default function Home() {
               <Link href="/login" className={buttonVariants({ variant: "outline", className: "mt-6" })}>
                 Masuk sebagai administrator
               </Link>
-            </div>
+            </Reveal>
             <ul className="space-y-4 text-lg">
-              <li className="flex gap-3">
-                <span aria-hidden className="mt-3 size-1.5 shrink-0 rounded-full bg-margin" />
-                Unggah PDF Capaian Pembelajaran, Alur Tujuan Pembelajaran, atau Buku Guru.
-              </li>
-              <li className="flex gap-3">
-                <span aria-hidden className="mt-3 size-1.5 shrink-0 rounded-full bg-margin" />
-                Tentukan kelas dan mata pelajaran yang dicakup setiap dokumen.
-              </li>
-              <li className="flex gap-3">
-                <span aria-hidden className="mt-3 size-1.5 shrink-0 rounded-full bg-margin" />
-                Pantau pengindeksan: memproses, terindeks, atau gagal.
-              </li>
+              {ADMIN_POINTS.map((point, index) => (
+                <Reveal as="li" key={point} delay={index * 100} className="flex gap-3">
+                  <span aria-hidden className="mt-3 size-1.5 shrink-0 rounded-full bg-margin" />
+                  {point}
+                </Reveal>
+              ))}
             </ul>
           </div>
         </section>
 
         <section className="border-t border-rule bg-sheet">
-          <div className="mx-auto flex w-full max-w-6xl flex-col items-start gap-6 px-5 py-14 sm:px-8 md:flex-row md:items-center md:justify-between">
+          <Reveal className="mx-auto flex w-full max-w-6xl flex-col items-start gap-6 px-5 py-14 sm:px-8 md:flex-row md:items-center md:justify-between">
             <p className="max-w-xl text-2xl font-bold leading-snug sm:text-3xl">Mulai dari satu topik yang akan Anda ajarkan minggu ini.</p>
             <Link href="/register" className={buttonVariants({ size: "lg" })}>
               Buat akun
             </Link>
-          </div>
+          </Reveal>
         </section>
       </main>
 

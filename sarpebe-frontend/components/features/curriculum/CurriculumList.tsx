@@ -65,10 +65,14 @@ export function CurriculumList({ documents }: CurriculumListProps) {
         </Notice>
       )}
       <ul className="divide-y divide-rule">
-        {documents.map((doc) => {
+        {documents.map((doc, index) => {
           const labelled = doc.grade_level || doc.subject;
           return (
-            <li key={doc.id} className="grid gap-3 py-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-6">
+            <li
+              key={doc.id}
+              className="row-in grid gap-3 py-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-6"
+              style={{ "--delay": `${Math.min(index, 8) * 45}ms` } as React.CSSProperties}
+            >
               <div className="min-w-0">
                 <a
                   href={doc.url_path}

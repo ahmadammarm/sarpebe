@@ -167,7 +167,10 @@ sarpebe-frontend/
 - Status is always icon + word (`<StatusStamp>`), never color alone. Notices use `<Notice>`; fields use `<Field>` / `<PasswordField>` so labels, hints and errors stay linked for assistive technology.
 - Use `buttonVariants()` on `<Link>` for link-styled buttons instead of nesting a `<Button>` inside a link.
 - All user-facing text is Bahasa Indonesia. Show errors through `getErrorMessage` (maps backend error codes to Indonesian); never display the backend's English `detail`.
-- No decorative animation. Spinners for real loading states are fine; `prefers-reduced-motion` is respected globally.
+- Motion is purposeful and CSS-only (no animation library). Page-load entrances use `.rise` with a `--delay` stagger; content that scrolls into view uses `<Reveal>`; the highlighter draws itself with `<Mark draw="load" | "view">`; mounting rows use `.row-in`; notices and status text use `tw-animate-css` (`animate-in fade-in ...`). Hidden-until-revealed styles only apply under `html[data-js]`, so nothing is hidden without JavaScript.
+- `prefers-reduced-motion` is respected globally (durations collapse in `globals.css`), and `setTheme` skips its transition too. Add new motion only where it explains a change of state or draws attention to the one thing that matters.
+- The theme switch reveals the new theme through a growing circle: `setTheme(theme, origin)` in `lib/theme.ts` wraps the change in `document.startViewTransition` and animates `clip-path` on `::view-transition-new(root)`. It falls back to an instant switch when the API is missing. Pass the toggle button's center as `origin`.
+- Highlighter (`.mark`) text and fill are fixed (`--mark-ink`, `--mark-fill`) and deliberately not overridden in dark mode; do not set a text color on `<Mark>` that depends on the theme.
 
 ## DRY Conventions
 

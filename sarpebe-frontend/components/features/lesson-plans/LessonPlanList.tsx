@@ -19,12 +19,16 @@ function formatDate(iso: string): string {
 export function LessonPlanList({ plans, onDelete, onDownload }: LessonPlanListProps) {
   return (
     <ul className="divide-y divide-rule">
-      {plans.map((plan) => (
-        <li key={plan.id} className="grid gap-3 py-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-6">
+      {plans.map((plan, index) => (
+        <li
+          key={plan.id}
+          className="row-in grid gap-3 py-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-6"
+          style={{ "--delay": `${Math.min(index, 8) * 45}ms` } as React.CSSProperties}
+        >
           <div className="min-w-0">
             <Link
               href={`/lesson-plans/${plan.id}`}
-              className="rounded-sm font-display text-xl font-semibold leading-snug underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/40"
+              className="rounded-sm font-display text-xl font-semibold leading-snug underline-offset-4 outline-none transition-colors hover:text-ballpoint hover:underline focus-visible:ring-3 focus-visible:ring-ring/40"
             >
               {plan.topic}
             </Link>

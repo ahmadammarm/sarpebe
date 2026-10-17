@@ -32,18 +32,18 @@ export function GenerationProgress({ status }: { status: LessonPlanStatus }) {
           <li
             key={stage.key}
             aria-current={active ? "step" : undefined}
-            className={cn("flex items-center gap-3", !done && !active && "text-ink-soft")}
+            className={cn("flex items-center gap-3 transition-colors duration-300", !done && !active && "text-ink-soft")}
           >
             <span
               className={cn(
-                "flex size-6 shrink-0 items-center justify-center rounded-full border",
+                "flex size-6 shrink-0 items-center justify-center rounded-full border transition-colors duration-300",
                 done && "border-tick/40 bg-tick-wash text-tick",
                 active && "border-ballpoint/40 bg-wash text-ballpoint",
                 !done && !active && "border-rule-strong"
               )}
             >
               {done ? (
-                <Check className="size-3.5" aria-hidden />
+                <Check className="pop size-3.5" aria-hidden />
               ) : active ? (
                 <Loader2 className="size-3.5 animate-spin" aria-hidden />
               ) : (
