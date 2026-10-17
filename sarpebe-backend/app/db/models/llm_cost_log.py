@@ -20,4 +20,4 @@ class LLMCostLog(Base):
 
     # Relationships
     user: Mapped["Profile"] = relationship("Profile", back_populates="llm_cost_logs")
-    lesson_plan: Mapped["LessonPlan"] = relationship("LessonPlan", back_populates="llm_cost_log")
+    lesson_plan: Mapped["LessonPlan"] = relationship("LessonPlan", back_populates="llm_cost_logs")
