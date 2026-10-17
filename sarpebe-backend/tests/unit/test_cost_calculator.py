@@ -1,3 +1,4 @@
+import pytest
 from decimal import Decimal
 from app.utils.cost_calculator import calculate_cost
 
@@ -8,6 +9,10 @@ def test_calculate_cost_gemini_flash_lite():
 def test_calculate_cost_gemini_embedding():
     cost = calculate_cost("gemini-embedding-2", 1000000, 0)
     assert cost == 10.0 # 0.00001 * 1M
+
+def test_calculate_cost_gemini_3_8_flash():
+    cost = calculate_cost("gemini-3.8-flash", 1000000, 1000000)
+    assert cost == pytest.approx(4.5)  # $0.75 in + $3.75 out per 1M tokens
 
 def test_calculate_cost_zero_tokens():
     cost = calculate_cost("gemini-2.5-flash-lite", 0, 0)

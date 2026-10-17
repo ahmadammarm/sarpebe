@@ -93,7 +93,8 @@ class LLMService:
         
         usage = response.usage_metadata
         prompt_tokens = usage.prompt_token_count if usage else 0
-        comp_tokens = usage.candidates_token_count if usage else 0
+        # Thinking tokens are billed as output but reported separately from candidates.
+        comp_tokens = ((usage.candidates_token_count or 0) + (usage.thoughts_token_count or 0)) if usage else 0
         await log_cost(
             model_name=settings.gemini_generation_model,
             operation_type="generation",

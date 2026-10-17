@@ -10,6 +10,11 @@ PRICING = {
         "input": Decimal("0.000075"),
         "output": Decimal("0.0003")
     },
+    # $0.75 / $3.75 per 1M tokens (introductory rate until 2026-12-31, then $1.50 / $7.50).
+    "gemini-3.8-flash": {
+        "input": Decimal("0.00000075"),
+        "output": Decimal("0.00000375")
+    },
     "gemini-embedding-2": {
         "input": Decimal("0.00001"),
         "output": Decimal("0.0")
