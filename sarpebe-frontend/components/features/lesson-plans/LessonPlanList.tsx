@@ -28,7 +28,7 @@ export function LessonPlanList({ plans, onDelete, onDownload }: LessonPlanListPr
           <div className="min-w-0">
             <Link
               href={`/lesson-plans/${plan.id}`}
-              className="rounded-sm font-display text-xl font-semibold leading-snug underline-offset-4 outline-none transition-colors hover:text-ballpoint hover:underline focus-visible:ring-3 focus-visible:ring-ring/40"
+              className="rounded-sm font-display text-lg font-semibold leading-snug [overflow-wrap:anywhere] underline-offset-4 sm:text-xl outline-none transition-colors hover:text-ballpoint hover:underline focus-visible:ring-3 focus-visible:ring-ring/40"
             >
               {plan.topic}
             </Link>

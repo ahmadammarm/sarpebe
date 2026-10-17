@@ -126,10 +126,10 @@ export function LessonPlanEditor({ plan }: LessonPlanEditorProps) {
             <span aria-hidden>·</span>
             <span>{plan.subject}</span>
           </p>
-          <h1 className="mt-1 text-3xl font-bold leading-tight sm:text-4xl">{content.title || plan.topic}</h1>
+          <h1 className="mt-1 text-2xl font-bold leading-tight [overflow-wrap:anywhere] sm:text-4xl">{content.title || plan.topic}</h1>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center">
           <Button variant="outline" onClick={handleDownload} disabled={downloadPdf.isPending}>
             <Download aria-hidden />
             {downloadPdf.isPending ? "Menyiapkan..." : "Unduh PDF"}

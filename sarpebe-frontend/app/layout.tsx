@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Atkinson_Hyperlegible_Next, Bricolage_Grotesque, Caveat } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
@@ -32,6 +32,13 @@ export const metadata: Metadata = {
   },
   description:
     "Susun modul ajar dari Capaian Pembelajaran resmi, lengkap dengan halaman rujukannya.",
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f5f7fc" },
+    { media: "(prefers-color-scheme: dark)", color: "#0e1424" },
+  ],
 };
 
 export default function RootLayout({

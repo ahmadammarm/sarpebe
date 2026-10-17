@@ -154,7 +154,7 @@ export function UploadForm() {
           </Notice>
         )}
 
-        <Button type="submit" size="lg" disabled={isUploading}>
+        <Button type="submit" size="lg" className="w-full sm:w-auto" disabled={isUploading}>
           <FileUp aria-hidden />
           {isUploading ? "Mengunggah..." : "Unggah dan indeks"}
         </Button>

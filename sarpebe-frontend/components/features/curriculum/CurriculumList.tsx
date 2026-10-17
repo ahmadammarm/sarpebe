@@ -58,7 +58,7 @@ export function CurriculumList({ documents }: CurriculumListProps) {
   }
 
   return (
-    <Sheet className="px-5 sm:px-8">
+    <Sheet className="px-5 sm:px-6 lg:px-8">
       {deleteError && (
         <Notice tone="error" className="mt-5">
           <p>{deleteError}</p>

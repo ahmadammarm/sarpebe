@@ -25,7 +25,7 @@ export function Notice({
   return (
     <div role={role} className={cn("flex gap-2.5 rounded-md border px-3 py-2.5 text-sm font-medium animate-in fade-in slide-in-from-top-1 duration-200", classes, className)}>
       <Icon className="mt-0.5 size-4 shrink-0" aria-hidden />
-      <div className="min-w-0 space-y-1.5">{children}</div>
+      <div className="min-w-0 space-y-1.5 [overflow-wrap:anywhere]">{children}</div>
     </div>
   );
 }

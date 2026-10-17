@@ -33,7 +33,7 @@ export function Field({ id, label, error, hint, labelAction, className, ...input
           {error}
         </p>
       ) : hint ? (
-        <div id={messageId} className="text-sm text-ink-soft">
+        <div id={messageId} className="text-sm text-ink-soft [overflow-wrap:anywhere]">
           {hint}
         </div>
       ) : null}
@@ -76,7 +76,7 @@ export function PasswordField({ id, label, error, hint, labelAction, className, 
           {error}
         </p>
       ) : hint ? (
-        <div id={messageId} className="text-sm text-ink-soft">
+        <div id={messageId} className="text-sm text-ink-soft [overflow-wrap:anywhere]">
           {hint}
         </div>
       ) : null}

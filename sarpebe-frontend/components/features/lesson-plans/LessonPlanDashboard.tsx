@@ -74,7 +74,7 @@ export function LessonPlanDashboard() {
     <div className="space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold sm:text-4xl">Modul ajar saya</h1>
+          <h1 className="text-2xl font-bold sm:text-3xl lg:text-4xl">Modul ajar saya</h1>
           <p className="mt-2 text-ink-soft" aria-live="polite">{summary}</p>
         </div>
         <Link href="/lesson-plans/new" className={buttonVariants({ size: "lg" })}>
@@ -102,7 +102,7 @@ export function LessonPlanDashboard() {
           </Link>
         </Sheet>
       ) : (
-        <Sheet className="px-5 sm:px-8">
+        <Sheet className="px-5 sm:px-6 lg:px-8">
           {isLoading ? (
             <p className="py-12 text-center text-ink-soft" role="status">Memuat daftar modul...</p>
           ) : (
@@ -110,7 +110,7 @@ export function LessonPlanDashboard() {
           )}
 
           {pageCount > 1 && (
-            <nav aria-label="Halaman daftar" className="flex items-center justify-between gap-3 border-t border-rule py-4 text-sm text-ink-soft">
+            <nav aria-label="Halaman daftar" className="flex flex-wrap items-center justify-between gap-3 border-t border-rule py-4 text-sm text-ink-soft">
               <span>
                 Halaman {page + 1} dari {pageCount}
               </span>
