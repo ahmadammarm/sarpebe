@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import Link from "next/link";
+import { AuthShell } from "@/components/brand/AuthShell";
+import { buttonVariants } from "@/components/ui/button";
 import { useVerifyEmail } from "@/lib/hooks/useAuth";
 import { getErrorMessage } from "@/lib/utils/errors";
 
@@ -24,47 +24,37 @@ export function VerifyEmailStatus() {
 
   if (!token || verify.isError) {
     return (
-      <Card className="w-full max-w-md mx-auto">
-        <CardHeader className="text-center">
-          <CardTitle>Verification failed</CardTitle>
-          <CardDescription>
-            {token
-              ? getErrorMessage(verify.error, "This verification link is invalid or has expired.")
-              : "This link is missing its token."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm text-gray-600 text-center">
-          <p>Sign in to request a new verification email.</p>
-          <Link href="/login">
-            <Button className="w-full">Go to Sign In</Button>
+      <AuthShell
+        title="Verifikasi gagal"
+        description={
+          token
+            ? getErrorMessage(verify.error, "Tautan ini tidak valid atau sudah kedaluwarsa.")
+            : "Tautan ini tidak membawa kode verifikasi."
+        }
+      >
+        <div className="space-y-4 text-ink-soft">
+          <p>Masuk dengan akun Anda, lalu pilih kirim ulang email verifikasi.</p>
+          <Link href="/login" className={buttonVariants({ size: "lg", className: "w-full" })}>
+            Ke halaman masuk
           </Link>
-        </CardContent>
-      </Card>
+        </div>
+      </AuthShell>
     );
   }
 
   if (verify.isSuccess) {
     return (
-      <Card className="w-full max-w-md mx-auto">
-        <CardHeader className="text-center">
-          <CardTitle>Email verified</CardTitle>
-          <CardDescription>Your account is ready to use</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Link href="/login">
-            <Button className="w-full">Sign In</Button>
-          </Link>
-        </CardContent>
-      </Card>
+      <AuthShell title="Email terverifikasi" description="Akun Anda sudah aktif dan siap dipakai.">
+        <Link href="/login" className={buttonVariants({ size: "lg", className: "w-full" })}>
+          Masuk
+        </Link>
+      </AuthShell>
     );
   }
 
   return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardHeader className="text-center">
-        <CardTitle>Verifying your email...</CardTitle>
-        <CardDescription>This only takes a moment</CardDescription>
-      </CardHeader>
-    </Card>
+    <AuthShell title="Memverifikasi email..." description="Sebentar saja.">
+      <div aria-live="polite" className="sr-only">Memverifikasi email</div>
+    </AuthShell>
   );
 }

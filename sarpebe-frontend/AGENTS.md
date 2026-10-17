@@ -159,6 +159,16 @@ sarpebe-frontend/
 
 ---
 
+## Design System ("buku tulis modern")
+
+- Tokens live in `app/globals.css` (light and dark under `[data-theme="dark"]`). Use the semantic classes (`bg-paper`, `bg-sheet`, `text-ink`, `text-ink-soft`, `border-rule`, `text-ballpoint`, `text-margin-text`, `bg-wash`) or the shadcn names (`bg-primary`, `border-input`). Never hard-code hex colors or Tailwind palette colors (`emerald-*`, `slate-*`).
+- Fonts: Bricolage Grotesque for headings (`font-display`, applied to `h1`-`h3`), Atkinson Hyperlegible Next for text, Caveat (`font-hand`) only for short margin notes.
+- Surfaces: `<Sheet>` is a page of paper; `margin` adds the red margin rule. `<Mark>` is the highlighter and is reserved for cited sources and one key phrase per screen. `Textarea lined` draws ruled lines.
+- Status is always icon + word (`<StatusStamp>`), never color alone. Notices use `<Notice>`; fields use `<Field>` / `<PasswordField>` so labels, hints and errors stay linked for assistive technology.
+- Use `buttonVariants()` on `<Link>` for link-styled buttons instead of nesting a `<Button>` inside a link.
+- All user-facing text is Bahasa Indonesia. Show errors through `getErrorMessage` (maps backend error codes to Indonesian); never display the backend's English `detail`.
+- No decorative animation. Spinners for real loading states are fine; `prefers-reduced-motion` is respected globally.
+
 ## DRY Conventions
 
 - `lib/api/client.ts` is the single HTTP client. Auth headers, base URL, and error handling are defined once. Never duplicate them.

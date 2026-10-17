@@ -1,9 +1,8 @@
+import type { Metadata } from "next";
 import { RegisterForm } from "@/components/features/auth/RegisterForm";
 
+export const metadata: Metadata = { title: "Buat akun" };
+
 export default function RegisterPage() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <RegisterForm />
-    </div>
-  );
+  return <RegisterForm />;
 }

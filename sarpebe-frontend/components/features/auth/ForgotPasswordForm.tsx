@@ -2,10 +2,10 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { AuthShell } from "@/components/brand/AuthShell";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Field } from "@/components/ui/field";
+import { Notice } from "@/components/ui/notice";
 import { forgotPasswordSchema, zodFieldErrors } from "@/lib/utils/validators";
 import { useForgotPassword } from "@/lib/hooks/useAuth";
 import { getErrorMessage } from "@/lib/utils/errors";
@@ -30,65 +30,59 @@ export function ForgotPasswordForm() {
     try {
       await forgotPassword.mutateAsync(parsed.data);
     } catch (error) {
-      setGlobalError(getErrorMessage(error, "Could not send the reset link. Please try again."));
+      setGlobalError(getErrorMessage(error, "Tautan belum bisa dikirim. Coba lagi sebentar lagi."));
     }
   };
 
   if (forgotPassword.isSuccess) {
     return (
-      <Card className="w-full max-w-md mx-auto">
-        <CardHeader className="text-center">
-          <CardTitle>Check your email</CardTitle>
-          <CardDescription>Password reset instructions</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 text-sm text-gray-600">
+      <AuthShell title="Cek email Anda">
+        <div className="space-y-4 text-ink-soft">
           <p>
-            If an account exists for <strong>{email}</strong>, we have sent a link to reset its password.
-            The link expires in one hour.
+            Jika ada akun untuk <strong className="text-foreground">{email}</strong>, kami sudah mengirim tautan
+            untuk membuat password baru. Tautan berlaku satu jam.
           </p>
-          <Link href="/login" className="block text-center text-blue-600 hover:underline">Back to Sign In</Link>
-        </CardContent>
-      </Card>
+          <Link href="/login" className="inline-block font-semibold text-ballpoint underline-offset-4 hover:underline">
+            Kembali ke halaman masuk
+          </Link>
+        </div>
+      </AuthShell>
     );
   }
 
   return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardHeader className="text-center">
-        <CardTitle>Forgot your password?</CardTitle>
-        <CardDescription>Enter your email and we will send you a reset link</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              placeholder="teacher@school.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className={emailError ? "border-destructive" : ""}
-            />
-            {emailError && <p className="text-sm font-medium text-destructive mt-1">{emailError}</p>}
-          </div>
+    <AuthShell
+      title="Lupa password"
+      description="Masukkan email akun Anda. Kami kirim tautan untuk membuat password baru."
+    >
+      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+        <Field
+          id="email"
+          label="Email"
+          type="email"
+          autoComplete="email"
+          placeholder="nama@sekolah.sch.id"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          error={emailError}
+        />
 
-          {globalError && (
-            <div className="text-sm font-medium text-red-500 bg-red-50 p-3 rounded-md" role="alert">
-              {globalError}
-            </div>
-          )}
+        {globalError && (
+          <Notice tone="error">
+            <p>{globalError}</p>
+          </Notice>
+        )}
 
-          <Button type="submit" className="w-full" disabled={forgotPassword.isPending}>
-            {forgotPassword.isPending ? "Sending..." : "Send reset link"}
-          </Button>
+        <Button type="submit" size="lg" className="w-full" disabled={forgotPassword.isPending}>
+          {forgotPassword.isPending ? "Mengirim..." : "Kirim tautan"}
+        </Button>
 
-          <div className="text-center text-sm mt-4 text-gray-600">
-            <Link href="/login" className="text-blue-600 hover:underline">Back to Sign In</Link>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+        <p className="text-center text-sm text-ink-soft">
+          <Link href="/login" className="font-semibold text-ballpoint underline-offset-4 hover:underline">
+            Kembali ke halaman masuk
+          </Link>
+        </p>
+      </form>
+    </AuthShell>
   );
 }

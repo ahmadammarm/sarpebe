@@ -1,12 +1,13 @@
 "use client";
 
+import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { useCurriculumDocuments } from "@/lib/hooks/useCurriculum";
 import { UploadForm } from "@/components/features/curriculum/UploadForm";
 import { CurriculumList } from "@/components/features/curriculum/CurriculumList";
-import { useSession } from "next-auth/react";
-import { ShieldAlert, ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
+import { Sheet } from "@/components/brand/Sheet";
+import { buttonVariants } from "@/components/ui/button";
+import { Notice } from "@/components/ui/notice";
 
 export default function CurriculumPage() {
   const { data: session, status } = useSession();
@@ -16,58 +17,52 @@ export default function CurriculumPage() {
   const { data: documents = [], isLoading, isError } = useCurriculumDocuments(isAdmin);
 
   if (status === "loading") {
-    return (
-      <div className="container mx-auto p-12 text-center text-slate-500">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto mb-3"></div>
-        Memeriksa hak akses...
-      </div>
-    );
+    return <p className="py-16 text-center text-ink-soft" role="status">Memeriksa hak akses...</p>;
   }
 
-  // Client-side guard fallback if accessed directly
+  // Client-side fallback; the route is also guarded by middleware and the API.
   if (role !== "admin") {
     return (
-      <div className="container mx-auto px-6 py-16 max-w-lg text-center">
-        <div className="bg-white border border-rose-100 rounded-2xl p-8 shadow-xs">
-          <div className="h-14 w-14 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-4">
-            <ShieldAlert className="h-7 w-7" />
-          </div>
-          <h2 className="text-2xl font-extrabold text-slate-900 mb-2">Akses Ditolak (403)</h2>
-          <p className="text-slate-600 text-sm mb-6 leading-relaxed">
-            Halaman Manajemen Dokumen Kurikulum hanya dapat diakses oleh akun dengan peran <strong>Admin</strong>. Akun Anda saat ini memiliki peran sebagai <strong>Guru / Pengajar</strong>.
+      <div className="mx-auto max-w-xl">
+        <Sheet margin className="py-10 pr-6 sm:pr-10">
+          <h1 className="text-3xl font-bold">Khusus administrator</h1>
+          <p className="mt-3 text-ink-soft">
+            Dokumen kurikulum hanya bisa dikelola oleh akun administrator. Akun Anda terdaftar sebagai guru.
           </p>
-          <Link href="/lesson-plans">
-            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Kembali ke Modul Ajar
-            </Button>
+          <Link href="/lesson-plans" className={buttonVariants({ className: "mt-6" })}>
+            Kembali ke modul ajar
           </Link>
-        </div>
+        </Sheet>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-8 max-w-6xl">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Manajemen Kurikulum</h1>
-          <p className="text-gray-500 mt-1">
-            Kelola dokumen kurikulum acuan RAG untuk menyelaraskan RPP secara otomatis.
-          </p>
-        </div>
+    <div className="space-y-10">
+      <div>
+        <h1 className="text-3xl font-bold sm:text-4xl">Dokumen kurikulum</h1>
+        <p className="mt-2 max-w-2xl text-ink-soft">
+          Dokumen yang diindeks di sini menjadi satu-satunya sumber modul ajar. Guru melihat rujukannya
+          sebagai nama dokumen dan halaman.
+        </p>
       </div>
 
       <UploadForm />
 
-      <h2 className="text-xl font-semibold mb-4 text-gray-800">Daftar Dokumen Kurikulum</h2>
-      {isLoading ? (
-        <div className="text-center p-8">Memuat dokumen...</div>
-      ) : isError ? (
-        <div className="text-center p-8 text-rose-600">Gagal mengambil data kurikulum.</div>
-      ) : (
-        <CurriculumList documents={documents} />
-      )}
+      <section aria-labelledby="daftar-dokumen" className="space-y-4">
+        <h2 id="daftar-dokumen" className="text-2xl font-bold">
+          Dokumen terunggah
+        </h2>
+        {isLoading ? (
+          <p className="py-8 text-ink-soft" role="status">Memuat dokumen...</p>
+        ) : isError ? (
+          <Notice tone="error">
+            <p>Daftar dokumen belum bisa dimuat. Muat ulang halaman, atau coba lagi nanti.</p>
+          </Notice>
+        ) : (
+          <CurriculumList documents={documents} />
+        )}
+      </section>
     </div>
   );
 }

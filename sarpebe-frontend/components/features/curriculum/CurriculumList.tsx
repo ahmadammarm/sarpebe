@@ -1,38 +1,46 @@
 "use client";
 
+import { useState } from "react";
+import { ExternalLink, Trash2 } from "lucide-react";
+import { FaseTag } from "@/components/brand/FaseTag";
+import { Sheet } from "@/components/brand/Sheet";
+import { StatusStamp } from "@/components/brand/StatusStamp";
+import { Button } from "@/components/ui/button";
+import { Notice } from "@/components/ui/notice";
 import { useDeleteCurriculumDocument } from "@/lib/hooks/useCurriculum";
 import { getErrorMessage } from "@/lib/utils/errors";
 import type { CurriculumDocument } from "@/types/curriculum";
-import { Button } from "@/components/ui/button";
-import { Trash2, FileText, CheckCircle2, Clock, AlertCircle, ExternalLink } from "lucide-react";
-import { useState } from "react";
 
 interface CurriculumListProps {
   documents: CurriculumDocument[];
 }
 
 const DOCUMENT_TYPE_LABELS: Record<CurriculumDocument["document_type"], string> = {
-  CP: "CP",
-  ATP: "ATP",
+  CP: "Capaian Pembelajaran",
+  ATP: "Alur Tujuan Pembelajaran",
   BUKU_GURU: "Buku Guru",
 };
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+}
 
 export function CurriculumList({ documents }: CurriculumListProps) {
   const deleteDocument = useDeleteCurriculumDocument();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Apakah Anda yakin ingin menghapus dokumen kurikulum ini beserta data vektornya?")) {
+  const handleDelete = async (doc: CurriculumDocument) => {
+    if (!confirm(`Hapus "${doc.title}" beserta seluruh isi yang sudah diindeks? Modul ajar tidak lagi bisa merujuk dokumen ini.`)) {
       return;
     }
 
     try {
-      setDeletingId(id);
+      setDeletingId(doc.id);
       setDeleteError(null);
-      await deleteDocument.mutateAsync(id);
+      await deleteDocument.mutateAsync(doc.id);
     } catch (err) {
-      setDeleteError(getErrorMessage(err, "Gagal menghapus dokumen kurikulum."));
+      setDeleteError(getErrorMessage(err, "Dokumen belum bisa dihapus. Coba lagi."));
     } finally {
       setDeletingId(null);
     }
@@ -40,115 +48,74 @@ export function CurriculumList({ documents }: CurriculumListProps) {
 
   if (documents.length === 0) {
     return (
-      <div className="text-center p-12 bg-white border border-slate-200/80 rounded-xl shadow-xs">
-        <div className="h-12 w-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-3">
-          <FileText className="h-6 w-6" />
-        </div>
-        <h3 className="font-semibold text-slate-800 mb-1">Belum Ada Dokumen Kurikulum</h3>
-        <p className="text-slate-500 text-sm max-w-sm mx-auto">
-          Unggah file PDF Capaian Pembelajaran untuk mulai mengaktifkan fitur pencarian RAG.
+      <Sheet margin className="py-10 pr-6 sm:pr-10">
+        <p className="font-hand text-3xl text-ink-soft">Belum ada dokumen.</p>
+        <p className="mt-2 max-w-md text-ink-soft">
+          Unggah PDF Capaian Pembelajaran lebih dulu. Tanpa dokumen, guru tidak bisa menyusun modul ajar.
         </p>
-      </div>
+      </Sheet>
     );
   }
 
   return (
-    <div className="border border-slate-200/80 rounded-xl overflow-hidden bg-white shadow-xs">
+    <Sheet className="px-5 sm:px-8">
       {deleteError && (
-        <div className="px-6 py-3 bg-rose-50 border-b border-rose-200 text-rose-800 text-sm flex items-center gap-2">
-          <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
-          {deleteError}
-        </div>
+        <Notice tone="error" className="mt-5">
+          <p>{deleteError}</p>
+        </Notice>
       )}
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-slate-100 text-sm">
-          <thead className="bg-slate-50 text-slate-500 font-semibold text-xs uppercase tracking-wider">
-            <tr>
-              <th className="px-6 py-3.5 text-left">Judul Dokumen</th>
-              <th className="px-6 py-3.5 text-left">Tipe</th>
-              <th className="px-6 py-3.5 text-left">Kelas / Mapel</th>
-              <th className="px-6 py-3.5 text-left">Status Pemrosesan</th>
-              <th className="px-6 py-3.5 text-left">Waktu Unggah</th>
-              <th className="px-6 py-3.5 text-right">Aksi</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {documents.map((doc) => (
-              <tr key={doc.id} className="hover:bg-emerald-50/30 transition-colors">
-                <td className="px-6 py-4 font-semibold text-slate-900">
-                  <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                      <FileText className="h-4 w-4" />
-                    </div>
-                    <a
-                      href={doc.url_path}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="hover:text-emerald-700 inline-flex items-center gap-1 group"
-                    >
-                      <span>{doc.title}</span>
-                      <ExternalLink className="h-3 w-3 text-slate-400 group-hover:text-emerald-600" />
-                    </a>
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-slate-500 uppercase text-xs font-semibold">
-                  {DOCUMENT_TYPE_LABELS[doc.document_type] ?? doc.document_type}
-                </td>
-                <td className="px-6 py-4 text-slate-600 text-xs">
-                  {doc.grade_level || doc.subject ? (
-                    <span className="capitalize">
-                      Kelas {doc.grade_level ?? "-"} · {doc.subject ?? "-"}
-                    </span>
+      <ul className="divide-y divide-rule">
+        {documents.map((doc) => {
+          const labelled = doc.grade_level || doc.subject;
+          return (
+            <li key={doc.id} className="grid gap-3 py-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-6">
+              <div className="min-w-0">
+                <a
+                  href={doc.url_path}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex max-w-full items-center gap-1.5 rounded-sm font-display text-lg font-semibold leading-snug underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/40"
+                >
+                  <span className="truncate">{doc.title}</span>
+                  <ExternalLink className="size-3.5 shrink-0 text-ink-soft" aria-hidden />
+                  <span className="sr-only">(buka PDF di tab baru)</span>
+                </a>
+                <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-soft">
+                  <span>{DOCUMENT_TYPE_LABELS[doc.document_type] ?? doc.document_type}</span>
+                  <span aria-hidden>·</span>
+                  {labelled ? (
+                    <>
+                      <span className="capitalize">Kelas {doc.grade_level ?? "-"}</span>
+                      {doc.grade_level && <FaseTag grade={doc.grade_level} />}
+                      <span aria-hidden>·</span>
+                      <span className="capitalize">{doc.subject ?? "-"}</span>
+                    </>
                   ) : (
-                    "-"
+                    <span className="font-medium text-margin-text">Tanpa label kelas dan mata pelajaran</span>
                   )}
-                </td>
-                <td className="px-6 py-4">
-                  {doc.status === "completed" && (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-                      <CheckCircle2 className="h-3 w-3" />
-                      Terindeks
-                    </span>
-                  )}
-                  {doc.status === "processing" && (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
-                      <Clock className="h-3 w-3 animate-spin" />
-                      Memproses Vektor
-                    </span>
-                  )}
-                  {doc.status === "failed" && (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-800">
-                      <AlertCircle className="h-3 w-3" />
-                      Gagal
-                    </span>
-                  )}
-                </td>
-                <td className="px-6 py-4 text-slate-500 text-xs">
-                  {new Date(doc.uploaded_at).toLocaleDateString("id-ID", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDelete(doc.id)}
-                    disabled={deletingId === doc.id}
-                    className="text-slate-400 hover:text-rose-600 hover:bg-rose-50"
-                  >
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    {deletingId === doc.id ? "Menghapus..." : "Hapus"}
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+                  <span aria-hidden>·</span>
+                  <time dateTime={doc.uploaded_at}>{formatDate(doc.uploaded_at)}</time>
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <StatusStamp kind="document" status={doc.status} />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDelete(doc)}
+                  disabled={deletingId === doc.id}
+                  aria-label={`Hapus dokumen ${doc.title}`}
+                  className="text-ink-soft hover:bg-margin-wash hover:text-margin-text"
+                >
+                  <Trash2 aria-hidden />
+                  {deletingId === doc.id ? "Menghapus..." : "Hapus"}
+                </Button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </Sheet>
   );
 }

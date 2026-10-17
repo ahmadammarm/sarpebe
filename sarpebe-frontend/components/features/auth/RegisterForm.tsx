@@ -1,14 +1,14 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
+import { AuthShell } from "@/components/brand/AuthShell";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, PasswordField } from "@/components/ui/field";
+import { Notice } from "@/components/ui/notice";
 import { registerSchema, RegisterFormData, zodFieldErrors } from "@/lib/utils/validators";
 import { useRegister } from "@/lib/hooks/useAuth";
 import { getErrorMessage } from "@/lib/utils/errors";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import Link from "next/link";
 
 export function RegisterForm() {
   const register = useRegister();
@@ -32,97 +32,86 @@ export function RegisterForm() {
       await register.mutateAsync(parsed.data);
       setRegisteredEmail(parsed.data.email);
     } catch (error) {
-      setGlobalError(getErrorMessage(error, "Could not create the account. Please try again."));
+      setGlobalError(getErrorMessage(error, "Akun belum bisa dibuat. Coba lagi sebentar lagi."));
     }
   };
 
   if (registeredEmail) {
     return (
-      <Card className="w-full max-w-md mx-auto">
-        <CardHeader className="text-center">
-          <CardTitle>Check your email</CardTitle>
-          <CardDescription>One more step to activate your account</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 text-sm text-gray-600">
+      <AuthShell title="Cek email Anda" description="Satu langkah lagi sebelum akun aktif.">
+        <div className="space-y-4 text-ink-soft">
           <p>
-            If <strong>{registeredEmail}</strong> can be registered, we have sent a verification link to it.
-            Open the link, then sign in.
+            Jika <strong className="text-foreground">{registeredEmail}</strong> bisa didaftarkan, kami sudah
+            mengirim tautan verifikasi ke alamat itu. Buka tautannya, lalu masuk.
           </p>
           <p>
-            Already have an account with this email? You can{" "}
-            <Link href="/forgot-password" className="text-blue-600 hover:underline">reset your password</Link>.
+            Sudah pernah mendaftar dengan email ini?{" "}
+            <Link href="/forgot-password" className="font-semibold text-ballpoint underline-offset-4 hover:underline">
+              Atur ulang password
+            </Link>
+            .
           </p>
-          <Link href="/login" className="block text-center text-blue-600 hover:underline">Back to Sign In</Link>
-        </CardContent>
-      </Card>
+          <Link href="/login" className="inline-block font-semibold text-ballpoint underline-offset-4 hover:underline">
+            Kembali ke halaman masuk
+          </Link>
+        </div>
+      </AuthShell>
     );
   }
 
   return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardHeader className="text-center">
-        <CardTitle>Create an Account</CardTitle>
-        <CardDescription>Get started with SARPEBE</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-          <div className="space-y-2">
-            <Label htmlFor="fullName">Full Name</Label>
-            <Input
-              id="fullName"
-              autoComplete="name"
-              placeholder="Jane Doe"
-              value={formData.fullName}
-              onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-              className={errors.fullName ? "border-destructive" : ""}
-            />
-            {errors.fullName && <p className="text-sm font-medium text-destructive mt-1">{errors.fullName}</p>}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              placeholder="teacher@school.com"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className={errors.email ? "border-destructive" : ""}
-            />
-            {errors.email && <p className="text-sm font-medium text-destructive mt-1">{errors.email}</p>}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              autoComplete="new-password"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              className={errors.password ? "border-destructive" : ""}
-            />
-            {errors.password ? (
-              <p className="text-sm font-medium text-destructive mt-1">{errors.password}</p>
-            ) : (
-              <p className="text-xs text-gray-500">At least 8 characters.</p>
-            )}
-          </div>
+    <AuthShell
+      title="Buat akun"
+      description="Akun dipakai untuk menyusun dan menyimpan modul ajar Anda."
+      note="Email hanya dipakai untuk verifikasi dan atur ulang password."
+    >
+      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+        <Field
+          id="fullName"
+          label="Nama lengkap"
+          autoComplete="name"
+          placeholder="Nama yang ingin ditampilkan"
+          value={formData.fullName}
+          onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+          error={errors.fullName}
+        />
+        <Field
+          id="email"
+          label="Email"
+          type="email"
+          autoComplete="email"
+          placeholder="nama@sekolah.sch.id"
+          value={formData.email}
+          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+          error={errors.email}
+        />
+        <PasswordField
+          id="password"
+          label="Password"
+          autoComplete="new-password"
+          value={formData.password}
+          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+          error={errors.password}
+          hint="Minimal 8 karakter."
+        />
 
-          {globalError && (
-            <div className="text-sm font-medium text-red-500 bg-red-50 p-3 rounded-md" role="alert">
-              {globalError}
-            </div>
-          )}
+        {globalError && (
+          <Notice tone="error">
+            <p>{globalError}</p>
+          </Notice>
+        )}
 
-          <Button type="submit" className="w-full" disabled={register.isPending}>
-            {register.isPending ? "Signing Up..." : "Sign Up"}
-          </Button>
+        <Button type="submit" size="lg" className="w-full" disabled={register.isPending}>
+          {register.isPending ? "Membuat akun..." : "Buat akun"}
+        </Button>
 
-          <div className="text-center text-sm mt-4 text-gray-600">
-            Already have an account? <Link href="/login" className="text-blue-600 hover:underline">Sign In</Link>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+        <p className="text-center text-sm text-ink-soft">
+          Sudah punya akun?{" "}
+          <Link href="/login" className="font-semibold text-ballpoint underline-offset-4 hover:underline">
+            Masuk
+          </Link>
+        </p>
+      </form>
+    </AuthShell>
   );
 }

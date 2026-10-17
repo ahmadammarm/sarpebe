@@ -3,10 +3,10 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AuthShell } from "@/components/brand/AuthShell";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { PasswordField } from "@/components/ui/field";
+import { Notice } from "@/components/ui/notice";
 import { resetPasswordSchema, ResetPasswordInput, zodFieldErrors } from "@/lib/utils/validators";
 import { useResetPassword } from "@/lib/hooks/useAuth";
 import { getErrorMessage } from "@/lib/utils/errors";
@@ -32,89 +32,67 @@ export function ResetPasswordForm() {
     try {
       await resetPassword.mutateAsync(parsed.data);
     } catch (error) {
-      setGlobalError(getErrorMessage(error, "Could not reset the password. Please try again."));
+      setGlobalError(getErrorMessage(error, "Password belum bisa diubah. Coba lagi sebentar lagi."));
     }
   };
 
   if (!token) {
     return (
-      <Card className="w-full max-w-md mx-auto">
-        <CardHeader className="text-center">
-          <CardTitle>Invalid reset link</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 text-sm text-gray-600">
-          <p>This link is missing its token. Request a new one.</p>
-          <Link href="/forgot-password" className="block text-center text-blue-600 hover:underline">
-            Request a new link
+      <AuthShell title="Tautan tidak lengkap">
+        <div className="space-y-4 text-ink-soft">
+          <p>Tautan ini tidak membawa kode pengaman. Minta tautan baru.</p>
+          <Link href="/forgot-password" className="inline-block font-semibold text-ballpoint underline-offset-4 hover:underline">
+            Minta tautan baru
           </Link>
-        </CardContent>
-      </Card>
+        </div>
+      </AuthShell>
     );
   }
 
   if (resetPassword.isSuccess) {
     return (
-      <Card className="w-full max-w-md mx-auto">
-        <CardHeader className="text-center">
-          <CardTitle>Password updated</CardTitle>
-          <CardDescription>You have been signed out of all devices</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Link href="/login">
-            <Button className="w-full">Sign In</Button>
-          </Link>
-        </CardContent>
-      </Card>
+      <AuthShell title="Password sudah diganti" description="Anda keluar dari semua perangkat. Masuk lagi dengan password baru.">
+        <Link href="/login" className={buttonVariants({ size: "lg", className: "w-full" })}>
+          Masuk
+        </Link>
+      </AuthShell>
     );
   }
 
   return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardHeader className="text-center">
-        <CardTitle>Choose a new password</CardTitle>
-        <CardDescription>Use at least 8 characters</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-          <div className="space-y-2">
-            <Label htmlFor="password">New password</Label>
-            <Input
-              id="password"
-              type="password"
-              autoComplete="new-password"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              className={errors.password ? "border-destructive" : ""}
-            />
-            {errors.password && <p className="text-sm font-medium text-destructive mt-1">{errors.password}</p>}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirm new password</Label>
-            <Input
-              id="confirmPassword"
-              type="password"
-              autoComplete="new-password"
-              value={formData.confirmPassword}
-              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-              className={errors.confirmPassword ? "border-destructive" : ""}
-            />
-            {errors.confirmPassword && (
-              <p className="text-sm font-medium text-destructive mt-1">{errors.confirmPassword}</p>
-            )}
-          </div>
+    <AuthShell title="Buat password baru" description="Pilih password yang belum pernah Anda pakai di tempat lain.">
+      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+        <PasswordField
+          id="password"
+          label="Password baru"
+          autoComplete="new-password"
+          value={formData.password}
+          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+          error={errors.password}
+          hint="Minimal 8 karakter."
+        />
+        <PasswordField
+          id="confirmPassword"
+          label="Ulangi password baru"
+          autoComplete="new-password"
+          value={formData.confirmPassword}
+          onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+          error={errors.confirmPassword}
+        />
 
-          {globalError && (
-            <div className="text-sm font-medium text-red-500 bg-red-50 p-3 rounded-md space-y-2" role="alert">
-              <p>{globalError}</p>
-              <Link href="/forgot-password" className="text-blue-600 hover:underline">Request a new link</Link>
-            </div>
-          )}
+        {globalError && (
+          <Notice tone="error">
+            <p>{globalError}</p>
+            <Link href="/forgot-password" className="font-semibold underline underline-offset-4 hover:no-underline">
+              Minta tautan baru
+            </Link>
+          </Notice>
+        )}
 
-          <Button type="submit" className="w-full" disabled={resetPassword.isPending}>
-            {resetPassword.isPending ? "Saving..." : "Update password"}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+        <Button type="submit" size="lg" className="w-full" disabled={resetPassword.isPending}>
+          {resetPassword.isPending ? "Menyimpan..." : "Simpan password baru"}
+        </Button>
+      </form>
+    </AuthShell>
   );
 }

@@ -1,11 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft, RefreshCw } from "lucide-react";
+import { Sheet } from "@/components/brand/Sheet";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Notice } from "@/components/ui/notice";
+import { GenerationProgress } from "@/components/features/lesson-plans/GenerationProgress";
+import { LessonPlanEditor } from "@/components/features/lesson-plans/LessonPlanEditor";
 import { useCreateLessonPlan, useLessonPlan } from "@/lib/hooks/useLessonPlans";
 import { getErrorMessage } from "@/lib/utils/errors";
-import { LessonPlanEditor } from "@/components/features/lesson-plans/LessonPlanEditor";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft, AlertCircle, Loader2, RefreshCw } from "lucide-react";
+import { describeFailure } from "@/lib/utils/lesson-plan";
 
 export default function LessonPlanDetailPage() {
   const params = useParams<{ id: string }>();
@@ -30,60 +35,72 @@ export default function LessonPlanDetailPage() {
   };
 
   if (isLoading) {
-    return <div className="p-8 text-center">Memuat Rencana Pembelajaran...</div>;
+    return <p className="py-16 text-center text-ink-soft" role="status">Memuat modul ajar...</p>;
   }
 
   if (isError || !plan) {
-    return <div className="p-8 text-center text-red-500">Rencana Pembelajaran tidak ditemukan.</div>;
+    return (
+      <div className="mx-auto max-w-xl space-y-4">
+        <Notice tone="error">
+          <p>Modul ajar tidak ditemukan. Mungkin sudah dihapus.</p>
+        </Notice>
+        <Link href="/lesson-plans" className={buttonVariants({ variant: "outline" })}>
+          Kembali ke daftar
+        </Link>
+      </div>
+    );
   }
 
+  if (plan.status === "completed") {
+    return <LessonPlanEditor key={plan.id} plan={plan} />;
+  }
+
+  const failure = describeFailure(plan.generated_content?.error);
+
   return (
-    <div className="container mx-auto p-8 max-w-4xl">
-      <Button
-        variant="ghost"
-        className="mb-6"
-        onClick={() => router.push("/lesson-plans")}
+    <div className="mx-auto max-w-2xl">
+      <Link
+        href="/lesson-plans"
+        className="inline-flex items-center gap-1.5 rounded-sm text-sm font-medium text-ink-soft outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/40"
       >
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Kembali ke Daftar
-      </Button>
+        <ArrowLeft className="size-4" aria-hidden />
+        Modul ajar saya
+      </Link>
 
-      {(plan.status === "pending" || plan.status === "processing") && (
-        <div className="py-16 text-center space-y-4 bg-white border border-slate-200/80 rounded-2xl shadow-xs">
-          <Loader2 className="h-10 w-10 animate-spin text-emerald-600 mx-auto" />
-          <h2 className="text-lg font-bold text-emerald-950">AI Sedang Menyusun Modul Ajar...</h2>
-          <p className="text-sm text-slate-500">
-            Topik: <strong>{plan.topic}</strong>. Halaman ini akan diperbarui otomatis setelah selesai.
-          </p>
-        </div>
-      )}
-
-      {plan.status === "failed" && (
-        <div className="py-12 px-6 text-center space-y-4 bg-white border border-rose-100 rounded-2xl shadow-xs">
-          <div className="h-14 w-14 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
-            <AlertCircle className="h-7 w-7" />
-          </div>
-          <h2 className="text-xl font-bold text-slate-900">Gagal Menyusun Modul Ajar</h2>
-          <p className="text-sm text-slate-600 max-w-md mx-auto">
-            {plan.generated_content?.error ?? "Terjadi kendala saat menyusun modul ajar ini."}
-          </p>
-          {regenerate.isError && (
-            <p className="text-sm text-rose-600">
-              {getErrorMessage(regenerate.error, "Gagal memulai pembuatan ulang.")}
+      <Sheet margin className="mt-4 py-8 pr-6 sm:pr-10">
+        {plan.status === "failed" ? (
+          <div role="alert">
+            <h1 className="text-3xl font-bold">Modul belum berhasil disusun</h1>
+            <p className="mt-2 text-ink-soft">
+              {plan.topic} · Kelas {plan.grade_level} · {plan.subject}
             </p>
-          )}
-          <Button
-            onClick={handleRegenerate}
-            disabled={regenerate.isPending}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white"
-          >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            {regenerate.isPending ? "Memulai..." : "Buat Ulang"}
-          </Button>
-        </div>
-      )}
-
-      {plan.status === "completed" && <LessonPlanEditor key={plan.id} plan={plan} />}
+            <p className="mt-5 text-lg">{failure.message}</p>
+            {failure.hint && <p className="mt-2 text-ink-soft">{failure.hint}</p>}
+            {regenerate.isError && (
+              <Notice tone="error" className="mt-5">
+                <p>{getErrorMessage(regenerate.error, "Pembuatan ulang belum bisa dimulai. Coba lagi.")}</p>
+              </Notice>
+            )}
+            <Button onClick={handleRegenerate} disabled={regenerate.isPending} className="mt-6">
+              <RefreshCw aria-hidden />
+              {regenerate.isPending ? "Memulai..." : "Buat ulang"}
+            </Button>
+          </div>
+        ) : (
+          <div aria-live="polite">
+            <h1 className="text-3xl font-bold">Sedang menyusun modul</h1>
+            <p className="mt-2 text-ink-soft">
+              {plan.topic} · Kelas {plan.grade_level} · {plan.subject}
+            </p>
+            <div className="mt-7">
+              <GenerationProgress status={plan.status} />
+            </div>
+            <p className="mt-6 font-hand text-xl text-ink-soft">
+              Halaman ini diperbarui sendiri saat modul selesai.
+            </p>
+          </div>
+        )}
+      </Sheet>
     </div>
   );
 }

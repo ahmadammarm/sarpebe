@@ -4,19 +4,19 @@ import React, { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { AuthShell } from "@/components/brand/AuthShell";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, PasswordField } from "@/components/ui/field";
+import { Notice } from "@/components/ui/notice";
 import { loginSchema, LoginFormData, zodFieldErrors } from "@/lib/utils/validators";
 import { AUTH_ERRORS } from "@/lib/utils/auth-errors";
 import { useResendVerification } from "@/lib/hooks/useAuth";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const LOGIN_ERROR_MESSAGES: Record<string, string> = {
-  [AUTH_ERRORS.invalidCredentials]: "Invalid email or password.",
-  [AUTH_ERRORS.emailNotVerified]: "Your email address has not been verified yet.",
-  [AUTH_ERRORS.tooManyAttempts]: "Too many failed attempts. Please wait a few minutes and try again.",
-  [AUTH_ERRORS.serverError]: "Could not reach the server. Please try again.",
+  [AUTH_ERRORS.invalidCredentials]: "Email atau password salah. Periksa lagi, atau atur ulang password Anda.",
+  [AUTH_ERRORS.emailNotVerified]: "Email Anda belum diverifikasi. Buka tautan di email pendaftaran.",
+  [AUTH_ERRORS.tooManyAttempts]: "Terlalu banyak percobaan gagal. Tunggu beberapa menit, lalu coba lagi.",
+  [AUTH_ERRORS.serverError]: "Server tidak dapat dihubungi. Coba lagi sebentar lagi.",
 };
 
 export function LoginForm() {
@@ -63,75 +63,69 @@ export function LoginForm() {
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardHeader className="text-center">
-        <CardTitle>Welcome Back</CardTitle>
-        <CardDescription>Sign in to your SARPEBE account</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              placeholder="teacher@school.com"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className={errors.email ? "border-destructive" : ""}
-            />
-            {errors.email && <p className="text-sm font-medium text-destructive mt-1">{errors.email}</p>}
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">Password</Label>
-              <Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">
-                Forgot password?
-              </Link>
-            </div>
-            <Input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              className={errors.password ? "border-destructive" : ""}
-            />
-            {errors.password && <p className="text-sm font-medium text-destructive mt-1">{errors.password}</p>}
-          </div>
+    <AuthShell
+      title="Masuk"
+      description="Lanjutkan menyusun modul ajar Anda."
+      note="Belum punya akun? Daftar dulu, hanya butuh email."
+    >
+      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+        <Field
+          id="email"
+          label="Email"
+          type="email"
+          autoComplete="email"
+          placeholder="nama@sekolah.sch.id"
+          value={formData.email}
+          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+          error={errors.email}
+        />
+        <PasswordField
+          id="password"
+          label="Password"
+          autoComplete="current-password"
+          value={formData.password}
+          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+          error={errors.password}
+          labelAction={
+            <Link href="/forgot-password" className="text-sm font-medium text-ballpoint underline-offset-4 hover:underline">
+              Lupa password?
+            </Link>
+          }
+        />
 
-          {loginError && (
-            <div className="text-sm font-medium text-red-500 bg-red-50 p-3 rounded-md space-y-2" role="alert">
-              <p>{LOGIN_ERROR_MESSAGES[loginError]}</p>
-              {needsVerification && !resendVerification.isSuccess && (
-                <button
-                  type="button"
-                  className="text-blue-600 hover:underline disabled:opacity-50"
-                  disabled={resendVerification.isPending}
-                  onClick={() => resendVerification.mutate(formData.email)}
-                >
-                  {resendVerification.isPending ? "Sending..." : "Resend verification email"}
-                </button>
-              )}
-            </div>
-          )}
+        {loginError && (
+          <Notice tone="error">
+            <p>{LOGIN_ERROR_MESSAGES[loginError]}</p>
+            {needsVerification && !resendVerification.isSuccess && (
+              <button
+                type="button"
+                className="font-semibold underline underline-offset-4 hover:no-underline disabled:opacity-50"
+                disabled={resendVerification.isPending}
+                onClick={() => resendVerification.mutate(formData.email)}
+              >
+                {resendVerification.isPending ? "Mengirim..." : "Kirim ulang email verifikasi"}
+              </button>
+            )}
+          </Notice>
+        )}
 
-          {resendVerification.isSuccess && (
-            <div className="text-sm font-medium text-green-700 bg-green-50 p-3 rounded-md" role="status">
-              If your account is waiting for verification, a new link is on its way. Check your inbox.
-            </div>
-          )}
+        {resendVerification.isSuccess && (
+          <Notice tone="success">
+            <p>Jika akun Anda menunggu verifikasi, tautan baru sudah dikirim. Periksa kotak masuk Anda.</p>
+          </Notice>
+        )}
 
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "Signing In..." : "Sign In"}
-          </Button>
+        <Button type="submit" size="lg" className="w-full" disabled={isLoading}>
+          {isLoading ? "Memeriksa..." : "Masuk"}
+        </Button>
 
-          <div className="text-center text-sm mt-4 text-gray-600">
-            Don&apos;t have an account? <Link href="/register" className="text-blue-600 hover:underline">Sign Up</Link>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+        <p className="text-center text-sm text-ink-soft">
+          Belum punya akun?{" "}
+          <Link href="/register" className="font-semibold text-ballpoint underline-offset-4 hover:underline">
+            Daftar
+          </Link>
+        </p>
+      </form>
+    </AuthShell>
   );
 }

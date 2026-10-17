@@ -1,37 +1,99 @@
 "use client";
 
-import { useState } from "react";
-import { useDownloadLessonPlanPdf, useUpdateLessonPlan } from "@/lib/hooks/useLessonPlans";
-import { getErrorMessage } from "@/lib/utils/errors";
-import type { LessonPlan, LessonPlanContent } from "@/types/lesson-plan";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { ArrowLeft, Download, Plus, Save, Trash2 } from "lucide-react";
+import { FaseTag } from "@/components/brand/FaseTag";
+import { Mark } from "@/components/brand/Mark";
+import { Sheet } from "@/components/brand/Sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Download, Save, BookOpen, Target, Sparkles, FileText, CheckCircle2, Bookmark, AlertCircle } from "lucide-react";
+import { Notice } from "@/components/ui/notice";
+import { Textarea } from "@/components/ui/textarea";
+import { useDownloadLessonPlanPdf, useUpdateLessonPlan } from "@/lib/hooks/useLessonPlans";
+import { getErrorMessage } from "@/lib/utils/errors";
+import type { LessonActivity, LessonPlan, LessonPlanContent } from "@/types/lesson-plan";
 
 interface LessonPlanEditorProps {
   plan: LessonPlan;
 }
 
+/** Drops blank lines and empty activities, so what is saved is what a reader would see. */
+function tidy(content: LessonPlanContent): LessonPlanContent {
+  const lines = (items?: string[]) => items?.map((item) => item.trim()).filter(Boolean);
+  return {
+    ...content,
+    objectives: lines(content.objectives),
+    materials: lines(content.materials),
+    activities: content.activities?.filter((a) => a.duration.trim() || a.description.trim()),
+  };
+}
+
+function Section({
+  id,
+  title,
+  help,
+  children,
+}: {
+  id: string;
+  title: string;
+  help?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section aria-labelledby={id} className="border-t border-rule py-7 first:border-t-0 first:pt-0">
+      <h2 id={id} className="text-xl font-bold">
+        {title}
+      </h2>
+      {help && <p className="mt-1 text-sm text-ink-soft">{help}</p>}
+      <div className="mt-4">{children}</div>
+    </section>
+  );
+}
+
 export function LessonPlanEditor({ plan }: LessonPlanEditorProps) {
-  const [content, setContent] = useState<LessonPlanContent>(plan.generated_content ?? {});
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const initial = plan.generated_content ?? {};
+  const [content, setContent] = useState<LessonPlanContent>(initial);
+  const [saved, setSaved] = useState<LessonPlanContent>(initial);
+  const [justSaved, setJustSaved] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const updatePlan = useUpdateLessonPlan(plan.id);
   const downloadPdf = useDownloadLessonPlanPdf();
-  const isSaving = updatePlan.isPending;
+
+  const dirty = JSON.stringify(content) !== JSON.stringify(saved);
+
+  // Warn before the tab closes with edits that were never saved.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
+  const updateField = <K extends keyof LessonPlanContent>(field: K, value: LessonPlanContent[K]) => {
+    setJustSaved(false);
+    setContent((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const updateActivity = (index: number, patch: Partial<LessonActivity>) => {
+    const activities = [...(content.activities ?? [])];
+    activities[index] = { ...activities[index], ...patch };
+    updateField("activities", activities);
+  };
 
   const handleSave = async () => {
     try {
-      setSaveSuccess(false);
       setErrorMsg(null);
-      await updatePlan.mutateAsync(content);
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
+      const tidied = tidy(content);
+      const updated = await updatePlan.mutateAsync(tidied);
+      const stored = updated.generated_content ?? tidied;
+      setContent(stored);
+      setSaved(stored);
+      setJustSaved(true);
     } catch (err) {
-      setErrorMsg(getErrorMessage(err, "Gagal menyimpan perubahan modul ajar."));
+      setErrorMsg(getErrorMessage(err, "Perubahan belum tersimpan. Coba lagi."));
     }
   };
 
@@ -40,162 +102,183 @@ export function LessonPlanEditor({ plan }: LessonPlanEditorProps) {
       setErrorMsg(null);
       await downloadPdf.mutateAsync({ id: plan.id, topic: content.title || plan.topic });
     } catch (err) {
-      setErrorMsg(getErrorMessage(err, "Gagal mengunduh PDF modul ajar."));
+      setErrorMsg(getErrorMessage(err, "PDF belum bisa diunduh. Coba lagi."));
     }
   };
 
-  const updateField = <K extends keyof LessonPlanContent>(field: K, value: LessonPlanContent[K]) => {
-    setContent((prev) => ({ ...prev, [field]: value }));
-  };
+  const citations = content.citations ?? [];
 
   return (
     <div className="space-y-6">
-      {/* Action Header Card */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-              Kelas {plan.grade_level}
-            </span>
-            <span className="text-slate-400">•</span>
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-              {plan.subject}
-            </span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-emerald-950 tracking-tight">
-            {content.title || plan.topic}
-          </h1>
+      <Link
+        href="/lesson-plans"
+        className="inline-flex items-center gap-1.5 rounded-sm text-sm font-medium text-ink-soft outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/40"
+      >
+        <ArrowLeft className="size-4" aria-hidden />
+        Modul ajar saya
+      </Link>
+
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-soft">
+            <span>Kelas {plan.grade_level}</span>
+            <FaseTag grade={plan.grade_level} />
+            <span aria-hidden>·</span>
+            <span>{plan.subject}</span>
+          </p>
+          <h1 className="mt-1 text-3xl font-bold leading-tight sm:text-4xl">{content.title || plan.topic}</h1>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            type="button"
-            className="border-emerald-200 text-emerald-800 hover:bg-emerald-50"
-            onClick={handleDownload}
-          >
-            <Download className="h-4 w-4 mr-2 text-emerald-600" />
-            Unduh PDF
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={handleDownload} disabled={downloadPdf.isPending}>
+            <Download aria-hidden />
+            {downloadPdf.isPending ? "Menyiapkan..." : "Unduh PDF"}
           </Button>
-          <Button onClick={handleSave} disabled={isSaving} className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-600/20">
-            <Save className="h-4 w-4 mr-2" />
-            {isSaving ? "Menyimpan..." : "Simpan Perubahan"}
+          <Button onClick={handleSave} disabled={!dirty || updatePlan.isPending}>
+            <Save aria-hidden />
+            {updatePlan.isPending ? "Menyimpan..." : "Simpan perubahan"}
           </Button>
         </div>
       </div>
 
+      <div aria-live="polite" className="min-h-6 text-sm">
+        {dirty && <span className="font-medium text-margin-text">Ada perubahan yang belum disimpan.</span>}
+        {!dirty && justSaved && <span className="font-medium text-tick">Perubahan tersimpan.</span>}
+      </div>
+
       {errorMsg && (
-        <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-sm flex items-center gap-2">
-          <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
-          {errorMsg}
-        </div>
+        <Notice tone="error">
+          <p>{errorMsg}</p>
+        </Notice>
       )}
 
-      {saveSuccess && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-sm flex items-center gap-2 animate-fade-in">
-          <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-          Perubahan pada modul ajar berhasil disimpan ke basis data!
-        </div>
-      )}
+      <Sheet margin className="py-8 pr-5 sm:pr-10">
+        <Section id="judul" title="Judul modul">
+          <Label htmlFor="title" className="sr-only">
+            Judul modul
+          </Label>
+          <Input
+            id="title"
+            value={content.title ?? ""}
+            onChange={(e) => updateField("title", e.target.value)}
+            className="h-12 font-display text-lg font-semibold"
+          />
+        </Section>
 
-      {/* 1. Informasi Umum */}
-      <Card className="border-slate-200/80 shadow-xs">
-        <CardHeader className="pb-3 border-b border-slate-50">
-          <CardTitle className="text-base font-bold text-emerald-950 flex items-center gap-2">
-            <FileText className="h-4 w-4 text-emerald-600" />
-            1. Informasi Umum & Judul Modul
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-4 space-y-4">
-          <div>
-            <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 block">
-              Judul Modul Ajar
-            </Label>
-            <Input
-              value={content.title || ""}
-              onChange={(e) => updateField("title", e.target.value)}
-              className="font-medium text-slate-900 focus-visible:ring-emerald-500"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* 2. Tujuan Pembelajaran */}
-      <Card className="border-slate-200/80 shadow-xs">
-        <CardHeader className="pb-3 border-b border-slate-50">
-          <CardTitle className="text-base font-bold text-emerald-950 flex items-center gap-2">
-            <Target className="h-4 w-4 text-emerald-600" />
-            2. Tujuan Pembelajaran (Capaian Pembelajaran)
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-4">
-          <textarea
-            className="w-full min-h-[120px] p-3.5 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 leading-relaxed font-sans"
+        <Section id="tujuan" title="Tujuan pembelajaran" help="Satu tujuan per baris.">
+          <Label htmlFor="objectives" className="sr-only">
+            Tujuan pembelajaran
+          </Label>
+          <Textarea
+            id="objectives"
+            lined
+            rows={6}
             value={(content.objectives ?? []).join("\n")}
             onChange={(e) => updateField("objectives", e.target.value.split("\n"))}
-            placeholder="Pisahkan setiap tujuan dengan baris baru (enter)"
           />
-        </CardContent>
-      </Card>
+        </Section>
 
-      {/* 3. Media & Sumber Belajar */}
-      <Card className="border-slate-200/80 shadow-xs">
-        <CardHeader className="pb-3 border-b border-slate-50">
-          <CardTitle className="text-base font-bold text-emerald-950 flex items-center gap-2">
-            <BookOpen className="h-4 w-4 text-emerald-600" />
-            3. Media & Sumber Belajar
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-4">
-          <textarea
-            className="w-full min-h-[100px] p-3.5 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 leading-relaxed font-sans"
+        <Section id="kegiatan" title="Kegiatan pembelajaran" help="Isi lama kegiatan dan apa yang dilakukan.">
+          <ul className="space-y-4">
+            {(content.activities ?? []).map((activity, index) => (
+              <li key={index} className="grid gap-3 sm:grid-cols-[9rem_minmax(0,1fr)_auto] sm:items-start">
+                <div>
+                  <Label htmlFor={`activity-duration-${index}`} className="mb-1.5">
+                    Durasi
+                  </Label>
+                  <Input
+                    id={`activity-duration-${index}`}
+                    placeholder="15 menit"
+                    value={activity.duration}
+                    onChange={(e) => updateActivity(index, { duration: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor={`activity-description-${index}`} className="mb-1.5">
+                    Kegiatan {index + 1}
+                  </Label>
+                  <Textarea
+                    id={`activity-description-${index}`}
+                    rows={3}
+                    value={activity.description}
+                    onChange={(e) => updateActivity(index, { description: e.target.value })}
+                  />
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="text-ink-soft hover:bg-margin-wash hover:text-margin-text sm:mt-7"
+                  aria-label={`Hapus kegiatan ${index + 1}`}
+                  onClick={() =>
+                    updateField(
+                      "activities",
+                      (content.activities ?? []).filter((_, i) => i !== index)
+                    )
+                  }
+                >
+                  <Trash2 aria-hidden />
+                </Button>
+              </li>
+            ))}
+          </ul>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-4"
+            onClick={() => updateField("activities", [...(content.activities ?? []), { duration: "", description: "" }])}
+          >
+            <Plus aria-hidden />
+            Tambah kegiatan
+          </Button>
+        </Section>
+
+        <Section id="media" title="Media dan sumber belajar" help="Satu item per baris.">
+          <Label htmlFor="materials" className="sr-only">
+            Media dan sumber belajar
+          </Label>
+          <Textarea
+            id="materials"
+            lined
+            rows={5}
             value={(content.materials ?? []).join("\n")}
             onChange={(e) => updateField("materials", e.target.value.split("\n"))}
-            placeholder="Pisahkan materi/media dengan baris baru"
           />
-        </CardContent>
-      </Card>
+        </Section>
 
-      {/* 4. Penilaian / Asesmen */}
-      <Card className="border-slate-200/80 shadow-xs">
-        <CardHeader className="pb-3 border-b border-slate-50">
-          <CardTitle className="text-base font-bold text-emerald-950 flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-emerald-600" />
-            4. Penilaian & Asesmen
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-4">
-          <textarea
-            className="w-full min-h-[100px] p-3.5 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 leading-relaxed font-sans"
-            value={content.assessment || ""}
+        <Section id="asesmen" title="Asesmen" help="Bagaimana Anda mengetahui tujuan sudah tercapai.">
+          <Label htmlFor="assessment" className="sr-only">
+            Asesmen
+          </Label>
+          <Textarea
+            id="assessment"
+            lined
+            rows={5}
+            value={content.assessment ?? ""}
             onChange={(e) => updateField("assessment", e.target.value)}
           />
-        </CardContent>
-      </Card>
+        </Section>
 
-      {/* 5. Sitasi & Referensi Dokumen Kurikulum */}
-      {content.citations && content.citations.length > 0 && (
-        <Card className="border-emerald-200/70 bg-emerald-50/40 shadow-xs">
-          <CardHeader className="pb-3 border-b border-emerald-100">
-            <CardTitle className="text-base font-bold text-emerald-950 flex items-center gap-2">
-              <Bookmark className="h-4 w-4 text-emerald-600" />
-              5. Referensi & Sitasi Dokumen Resmi (Grounding RAG)
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <ul className="space-y-2 text-sm text-emerald-900">
-              {content.citations.map((cite, idx) => (
-                <li key={idx} className="flex items-start gap-2 bg-white/80 p-2.5 rounded-lg border border-emerald-100">
-                  <span className="h-5 w-5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
-                    {idx + 1}
-                  </span>
-                  <span>{cite}</span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
+        <Section id="rujukan" title="Sumber rujukan">
+          {citations.length > 0 ? (
+            <>
+              <ul className="space-y-2">
+                {citations.map((citation, index) => (
+                  <li key={index} className="leading-7">
+                    <Mark>{citation}</Mark>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-4 font-hand text-xl text-ink-soft">
+                Dicatat otomatis dari dokumen CP yang diunggah, jadi tidak bisa disunting di sini.
+              </p>
+            </>
+          ) : (
+            <Notice tone="info">
+              <p>Modul ini tidak mencantumkan rujukan. Cocokkan isinya dengan dokumen CP sebelum dipakai.</p>
+            </Notice>
+          )}
+        </Section>
+      </Sheet>
     </div>
   );
 }

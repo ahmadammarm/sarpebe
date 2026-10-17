@@ -6,22 +6,22 @@ const MAX_PASSWORD_BYTES = 72; // bcrypt's limit, enforced by the backend as wel
 // accounts imported from the old auth provider may have shorter passwords.
 const newPasswordSchema = z
   .string()
-  .min(8, "Password must be at least 8 characters.")
-  .refine((value) => new TextEncoder().encode(value).length <= MAX_PASSWORD_BYTES, "Password is too long.");
+  .min(8, "Password minimal 8 karakter.")
+  .refine((value) => new TextEncoder().encode(value).length <= MAX_PASSWORD_BYTES, "Password terlalu panjang.");
 
 export const loginSchema = z.object({
-  email: z.string().email("Please enter a valid email address."),
-  password: z.string().min(1, "Password is required."),
+  email: z.string().email("Masukkan alamat email yang valid."),
+  password: z.string().min(1, "Password wajib diisi."),
 });
 
 export const registerSchema = z.object({
-  fullName: z.string().trim().min(2, "Full name must be at least 2 characters."),
-  email: z.string().email("Please enter a valid email address."),
+  fullName: z.string().trim().min(2, "Nama lengkap minimal 2 karakter."),
+  email: z.string().email("Masukkan alamat email yang valid."),
   password: newPasswordSchema,
 });
 
 export const forgotPasswordSchema = z.object({
-  email: z.string().email("Please enter a valid email address."),
+  email: z.string().email("Masukkan alamat email yang valid."),
 });
 
 export const resetPasswordSchema = z
@@ -31,7 +31,7 @@ export const resetPasswordSchema = z
   })
   .refine((value) => value.password === value.confirmPassword, {
     path: ["confirmPassword"],
-    message: "Passwords do not match.",
+    message: "Password tidak sama.",
   });
 
 export const lessonPlanCreateSchema = z.object({
