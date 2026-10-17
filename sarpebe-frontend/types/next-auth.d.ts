@@ -6,12 +6,17 @@ declare module "next-auth" {
       id: string;
       role: string;
     };
-    supabaseAccessToken?: string;
+    accessToken?: string;
+    /** Set to "RefreshAccessTokenError" when the session can no longer be renewed. */
+    error?: string;
   }
 
   interface User {
     role?: string;
-    access_token?: string;
+    accessToken?: string;
+    refreshToken?: string;
+    /** Epoch milliseconds. */
+    accessTokenExpires?: number;
   }
 }
 
@@ -20,5 +25,8 @@ declare module "next-auth/jwt" {
     id?: string;
     role?: string;
     accessToken?: string;
+    refreshToken?: string;
+    accessTokenExpires?: number;
+    error?: string;
   }
 }

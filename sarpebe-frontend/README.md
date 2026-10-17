@@ -140,8 +140,8 @@ cp .env.local.example .env.local
 | Variable | Description |
 |---|---|
 | `NEXT_PUBLIC_API_BASE_URL` | Base URL of the SARPEBE backend API |
-| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Your Supabase anonymous key |
+| `NEXTAUTH_URL` | Public URL of the frontend (e.g. `http://localhost:3000`) |
+| `NEXTAUTH_SECRET` | Secret used to sign the NextAuth session cookie |
 
 ### Running the Development Server
 

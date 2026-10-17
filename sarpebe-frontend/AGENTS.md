@@ -134,8 +134,9 @@ sarpebe-frontend/
 
 ### 6. Authentication
 
-- The auth token (Supabase JWT) is stored in the auth store (`lib/stores/auth-store.ts`), not in `localStorage` directly.
-- `lib/api/client.ts` reads the token from the auth store and attaches it to every request as `Authorization: Bearer <token>`.
+- Sessions are managed by NextAuth (JWT strategy, credentials provider) against the backend's `/api/auth/login`. The access token and refresh token live in the NextAuth session cookie, never in `localStorage`; the refresh token is not exposed to browser code.
+- `lib/authOptions.ts` renews the access token through `/api/auth/refresh` shortly before it expires, and revokes the refresh token on sign out. If renewal is refused, `session.error` is set and `SessionGuard` (`app/providers.tsx`) signs the user out.
+- `lib/api/client.ts` reads `session.accessToken` and attaches it to every request as `Authorization: Bearer <token>`.
 - Protected pages must check authentication in their layout or via Next.js middleware. Never show protected content to unauthenticated users, even briefly.
 
 ### 7. Component Structure
@@ -197,8 +198,8 @@ All environment variables are prefixed with `NEXT_PUBLIC_` to be accessible in t
 | Variable | Description |
 |---|---|
 | `NEXT_PUBLIC_API_BASE_URL` | Base URL of the SARPEBE backend API |
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous (public) key |
+| `NEXTAUTH_URL` | Public URL of the frontend (e.g. `http://localhost:3000`) |
+| `NEXTAUTH_SECRET` | Secret used to sign the NextAuth session cookie |
 
 ---
 

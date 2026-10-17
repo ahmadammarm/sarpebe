@@ -1,7 +1,8 @@
 import axios from "axios";
 import { getSession } from "next-auth/react";
+import { API_BASE_URL } from "./config";
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+export { API_BASE_URL };
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -10,7 +11,7 @@ export const apiClient = axios.create({
 
 export async function getAuthToken(): Promise<string | undefined> {
   const session = await getSession();
-  return session?.supabaseAccessToken;
+  return session?.accessToken;
 }
 
 apiClient.interceptors.request.use(async (config) => {

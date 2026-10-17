@@ -1,15 +1,38 @@
 import { z } from "zod";
 
+const MAX_PASSWORD_BYTES = 72; // bcrypt's limit, enforced by the backend as well
+
+// Strength rules for choosing a password. Login deliberately does not apply them:
+// accounts imported from the old auth provider may have shorter passwords.
+const newPasswordSchema = z
+  .string()
+  .min(8, "Password must be at least 8 characters.")
+  .refine((value) => new TextEncoder().encode(value).length <= MAX_PASSWORD_BYTES, "Password is too long.");
+
 export const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address."),
-  password: z.string().min(6, "Password must be at least 6 characters."),
+  password: z.string().min(1, "Password is required."),
 });
 
 export const registerSchema = z.object({
-  fullName: z.string().min(2, "Full name must be at least 2 characters."),
+  fullName: z.string().trim().min(2, "Full name must be at least 2 characters."),
   email: z.string().email("Please enter a valid email address."),
-  password: z.string().min(6, "Password must be at least 6 characters."),
+  password: newPasswordSchema,
 });
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().email("Please enter a valid email address."),
+});
+
+export const resetPasswordSchema = z
+  .object({
+    password: newPasswordSchema,
+    confirmPassword: z.string(),
+  })
+  .refine((value) => value.password === value.confirmPassword, {
+    path: ["confirmPassword"],
+    message: "Passwords do not match.",
+  });
 
 export const lessonPlanCreateSchema = z.object({
   grade_level: z
@@ -43,6 +66,9 @@ export const curriculumUploadSchema = z.object({
 
 export type LoginFormData = z.infer<typeof loginSchema>;
 export type RegisterFormData = z.infer<typeof registerSchema>;
+export type RegisterInput = RegisterFormData;
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type LessonPlanCreateInput = z.infer<typeof lessonPlanCreateSchema>;
 export type CurriculumUploadInput = z.infer<typeof curriculumUploadSchema>;
 

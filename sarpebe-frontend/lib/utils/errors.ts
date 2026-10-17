@@ -9,6 +9,15 @@ export function getErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+/** The backend's stable machine-readable error code (e.g. "email_not_verified"), if any. */
+export function getErrorCode(error: unknown): string | undefined {
+  if (axios.isAxiosError(error)) {
+    const code = error.response?.data?.code;
+    if (typeof code === "string") return code;
+  }
+  return undefined;
+}
+
 export function isNotFoundError(error: unknown): boolean {
   return axios.isAxiosError(error) && error.response?.status === 404;
 }
