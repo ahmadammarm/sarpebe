@@ -1,6 +1,6 @@
-# SARPEBE Backend: Database Architecture
+# Database
 
-This document outlines the comprehensive database schema design for the SARPEBE (Sistem Automasi Rencana Pembelajaran Berbasis Kurikulum) backend. The database leverages **PostgreSQL (hosted on Supabase)** and utilizes the **pgvector** extension for semantic AI search.
+The schema of the SARPEBE backend. The database is **PostgreSQL (hosted on Supabase; 17 is in use)** with the **pgvector** extension (0.8 or newer recommended for filtered HNSW search) and the built-in Indonesian text-search configuration. Schema changes are made only through Alembic migrations in `sarpebe-backend/alembic/versions/`; see the migration history at the end of this document.
 
 ## Entity Relationship Diagram (ERD)
 
@@ -13,7 +13,7 @@ erDiagram
     
     curriculum_documents ||--o{ document_chunks : "is split into"
     
-    lesson_plans ||--o| llm_cost_logs : "generates log"
+    lesson_plans ||--o{ llm_cost_logs : "generates logs"
 
     profiles {
         uuid id PK
@@ -23,6 +23,7 @@ erDiagram
         varchar full_name
         varchar school_name
         varchar subscription_tier "free, premium"
+        varchar role "user, admin"
         timestamp created_at
     }
 
@@ -33,6 +34,9 @@ erDiagram
         varchar url_path "Storage path to PDF"
         varchar grade_level "Normalized label"
         varchar subject "Normalized label"
+        varchar status "processing, completed, failed"
+        int ingest_version "2 = table-aware ingestion"
+        jsonb ingest_warnings
         timestamp uploaded_at
     }
 
@@ -41,7 +45,12 @@ erDiagram
         uuid document_id FK "(CASCADE)"
         text chunk_content
         vector embedding "Gemini Embeddings (768 dims)"
-        int page_number
+        int page_number "first page"
+        int page_end "last page if spanning"
+        text heading "heading path"
+        varchar chunk_type "text, table"
+        varchar embedding_model
+        tsvector search_vector "generated, Indonesian"
         varchar grade_level "Denormalized for vector filter"
         varchar subject "Denormalized for vector filter"
     }
@@ -74,6 +83,11 @@ erDiagram
         jsonb generated_content "Denormalized lesson structure"
         varchar status "pending, processing, completed, failed"
         varchar job_id "Celery task id (indexed)"
+        int schema_version "1 short, 2 full Modul Ajar"
+        jsonb request_options
+        varchar prompt_version
+        varchar model_name
+        jsonb generation_meta "stage, retrieval and generation stats"
         timestamp created_at
     }
 
@@ -81,7 +95,7 @@ erDiagram
         uuid id PK
         uuid user_id FK "(CASCADE)"
         uuid lesson_plan_id FK "(SET NULL)"
-        varchar operation_type "generation, embedding"
+        varchar operation_type "generation, repair, rerank, embedding, eval"
         int prompt_tokens
         int completion_tokens
         decimal total_cost
@@ -103,6 +117,7 @@ erDiagram
 - `full_name` (VARCHAR): User's displayed full name.
 - `school_name` (VARCHAR): The institution the user belongs to.
 - `subscription_tier` (VARCHAR): 'free' or 'premium'. Currently informational; no quota is enforced.
+- `role` (VARCHAR): `user` (default) or `admin`.
 - `created_at` (TIMESTAMP): Record creation timestamp.
 
 ### 2. `curriculum_documents`
@@ -114,7 +129,7 @@ erDiagram
 - `document_type` (VARCHAR): Category ("CP", "ATP", "BUKU_GURU").
 - `grade_level` / `subject` (VARCHAR, nullable): Normalized labels (see `app/utils/labels.py`) the document was ingested under.
 - `status` (VARCHAR): 'processing', 'completed' or 'failed'.
-- `url_path` (VARCHAR): Storage path in Supabase Storage.
+- `url_path` (VARCHAR): Public URL of the PDF in Supabase Storage.
 - `uploaded_at` (TIMESTAMP): Ingestion timestamp.
 - `ingest_version` (INT, default 1): Version of the ingestion pipeline that produced the chunks. 2 = table-aware extraction + structure-aware chunking. `python -m scripts.reindex_documents` re-ingests older documents.
 - `ingest_warnings` (JSONB): Problems found while reading the PDF, e.g. pages without text (probably scanned).
@@ -180,6 +195,9 @@ erDiagram
 - `token_hash` (VARCHAR, unique): SHA-256 of the token.
 - `expires_at`, `used_at` (TIMESTAMP). Issuing a new token invalidates earlier unused ones of the same purpose.
 
+### Other notes on `llm_cost_logs`
+`operation_type` is one of `generation`, `repair`, `rerank`, `embedding`, `eval`. `completion_tokens` includes thinking tokens. `lesson_plan_id` is null for embeddings made at ingestion and for evaluations, and becomes null if the plan is deleted.
+
 ## Advanced Database Concepts
 
 ### 1. Indexes & Performance Tuning (pgvector)
@@ -189,7 +207,7 @@ To ensure the RAG similarity search remains extremely fast as the dataset grows 
 - **B-Tree Indexes:** on Foreign Keys (`user_id`, `document_id`) and a composite `(grade_level, subject)` index for the pre-filter. With only a handful of rows the planner still scans sequentially; the indexes matter as the corpus grows.
 
 ### 2. Security (access control)
-The backend connects with a privileged role and authenticates users itself, so Supabase Row Level Security (which relies on `auth.uid()`) does not apply. Ownership is enforced in the repository layer:
+The backend connects with a privileged role and authenticates users itself, so Supabase Row Level Security (which relies on `auth.uid()`) does not apply. See [authentication-security.md](authentication-security.md). Ownership is enforced in the repository layer:
 - `lesson_plans` queries always filter by the authenticated `user_id` (`get_by_id_and_user`, `get_by_job_id_and_user`).
 - Curriculum documents and chunks are only written through admin-only endpoints (`require_admin`).
 - Do not expose the database to clients directly (e.g. via Supabase's public API) without re-enabling RLS policies.
@@ -234,3 +252,21 @@ To ensure system stability, prevent race conditions, and maintain high performan
 - **Context:** FastAPI is an asynchronous framework. Under heavy load, it can instantly spawn hundreds of concurrent tasks, each demanding a database connection, which can quickly crash PostgreSQL with a "Too many connections" error.
 - **Rule:** The FastAPI application must never connect directly to the raw PostgreSQL instance port (e.g., 5432) in production.
 - **Implementation:** Always route connections through Supabase's built-in connection pooler (Supavisor / PgBouncer), which typically runs on port 6543 (IPv4) or using transaction mode. Configure SQLAlchemy's `AsyncEngine` pool settings (`pool_size`, `max_overflow`) to align with the external pooler's capacity.
+
+## Label normalization
+
+`grade_level` and `subject` are stored and queried in normalized form (`app/utils/labels.py`: trimmed, whitespace collapsed, case-folded). Retrieval compares them exactly, so a document uploaded as `seluruh kelas` is not found by a plan for `9`. Use the same labels when uploading and when requesting.
+
+## Migration history
+
+| Revision | Purpose |
+|---|---|
+| `949842977c3c` | Initial schema (profiles, curriculum documents, chunks, plans, cost logs). |
+| `62e6e3c0b1b1` | `profiles.role`. |
+| `5f8613dc7ef8` | `curriculum_documents.status`. |
+| `a3c1d9e47b20` | `lesson_plans.job_id`; normalized labels on documents. |
+| `b7e2f4a91c35` | Backend authentication: password hash, verification time, `refresh_tokens`, `auth_tokens`; import of Supabase Auth accounts. |
+| `c4d8e1f2a903` | AI pipeline metadata: plan `schema_version`, `request_options`, `prompt_version`, `model_name`, `generation_meta`; chunk `heading`, `chunk_type`, `page_end`, `embedding_model`; document `ingest_version`, `ingest_warnings`. |
+| `d5e9f3a4b017` | Retrieval indexes: generated `search_vector` with GIN, `(grade_level, subject)` btree, HNSW on `embedding`. |
+
+Apply with `alembic upgrade head` from `sarpebe-backend/`. After applying the last two on an existing database, run `python -m scripts.reindex_documents --all` so old chunks get headings, table chunks, normalized embeddings and the new metadata. Migration rules are in `.claude/rules/database-migrations.md`.

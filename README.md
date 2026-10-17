@@ -1,102 +1,97 @@
 # SARPEBE
+
 **Sistem Automasi Rencana Pembelajaran Berbasis Kurikulum**
 
-SARPEBE is an educational platform that automates the generation of curriculum-aligned lesson plans for Indonesian educators. It leverages Retrieval-Augmented Generation (RAG) powered by Google Gemini to produce structured lesson plans grounded strictly in official curriculum documents (Capaian Pembelajaran, ATP, and Buku Guru), with every objective traceable to its source page.
+SARPEBE helps Indonesian teachers write a complete Modul Ajar (Kurikulum Merdeka) from the official curriculum documents. A teacher gives a class, subject and topic; the system finds the relevant parts of the Capaian Pembelajaran (CP), ATP or Buku Guru PDFs that an administrator uploaded, and drafts the module with those sources. Every learning objective can be traced to a page, and if the documents do not cover the topic the system says so instead of inventing content.
 
----
+## What a generated module contains
 
-## Overview
+General information (identity, initial competencies, Pancasila profile, facilities, learning model), core components (learning objectives with sources, meaningful understanding, trigger questions, preparation), activities per meeting as tables with minutes that add up, assessment (diagnostic, formative, summative, overview and rubric tables), enrichment and remedial activities, reflection, and attachments (worksheet, reading material, glossary). The teacher edits everything in the browser, including table cells, and exports a PDF.
 
-Traditional lesson plan creation is time-consuming and often inconsistent with the latest curriculum standards. SARPEBE solves this by allowing educators to specify a grade level, subject, and topic, then automatically generating a complete Modul Ajar (general information, learning objectives, per-meeting activity tables, assessment with rubric, enrichment and remedial, reflection, worksheet, reading material and glossary) in the background, with references taken from the uploaded official documents.
-
----
-
-## Repository Structure
-
-This repository is a monorepo containing two independent applications.
+## How it works
 
 ```
-sarpebe/
-├── sarpebe-frontend/   — Next.js 16 web application (user interface)
-├── sarpebe-backend/    — FastAPI REST API (AI engine & business logic)
-└── README.md
+Browser (Next.js)  -->  FastAPI  -->  Celery worker  -->  Gemini
+                          |               |
+                          +----  Supabase PostgreSQL + pgvector, Storage  ----+      Redis
 ```
 
-- [Frontend — sarpebe-frontend/](sarpebe-frontend/)
-- [Backend — sarpebe-backend/](sarpebe-backend/)
+1. An administrator uploads a CP PDF with its class and subject. A worker reads the text and tables, splits it by structure, and stores embeddings.
+2. A teacher submits a topic with the number of meetings, minutes per meeting, teaching model and notes. The API answers at once with a job id.
+3. The worker retrieves the best passages (class and subject filter, vector plus keyword search, relevance floor, rerank), asks Gemini for a structured module, checks it (tables, minutes, sources), repairs it once if needed, and saves it with server-built references.
+4. The browser follows progress live (finding sources, drafting, checking) and opens the editor when it is ready. Generation takes about 20 to 60 seconds.
 
----
+Quality is measured with an offline evaluation harness, and every prompt and schema change is versioned. See [docs/ai-pipeline.md](docs/ai-pipeline.md) and [docs/ai-evaluation.md](docs/ai-evaluation.md).
 
-## Architecture
-
-The system follows a clean, layered architecture across both applications. Each layer communicates only with the layer directly beneath it.
-
-```
-Browser (Next.js)
-    |
-    | HTTP/REST
-    v
-API Layer (FastAPI Routers)
-    |
-    v
-Service Layer (Business Logic, RAG Orchestration)
-    |
-    v
-Repository Layer (Database Queries, pgvector Search)
-    |
-    v
-Supabase (PostgreSQL + pgvector + Storage)
-```
-
-Long-running AI generation requests are offloaded to Celery background workers, keeping the API non-blocking. The frontend follows the job over Server-Sent Events and falls back to polling.
-
----
-
-## Tech Stack Summary
+## Tech stack
 
 | Layer | Technology |
 |---|---|
-| Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS |
-| Backend API | FastAPI, Python 3.11+ |
-| Database | Supabase (PostgreSQL) |
-| Search | pgvector (HNSW) + PostgreSQL Indonesian full-text search, fused by reciprocal rank fusion |
-| AI Engine | Google Gemini API (structured generation, small-model rerank, embeddings) |
-| Background Tasks | Celery + Redis |
-| ORM & Migrations | SQLAlchemy 2.0 + Alembic |
-| Auth | Backend-issued JWT access tokens + rotating refresh tokens (bcrypt passwords, `/api/auth/*`) |
+| Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS 4, shadcn/ui, TanStack Query, NextAuth |
+| Backend | FastAPI, Python 3.11+, SQLAlchemy 2.0 (async), Alembic, Pydantic v2 |
+| Database | Supabase PostgreSQL with pgvector (HNSW) and Indonesian full-text search |
+| Storage | Supabase Storage (curriculum PDFs) |
+| AI | Google Gemini: embeddings, small-model rerank, structured generation |
+| Background work | Celery with Redis |
+| Authentication | Backend-issued JWT access tokens and rotating refresh tokens, bcrypt passwords |
 
----
+## Repository layout
 
-## Core Features
+```
+sarpebe/
+  sarpebe-frontend/   web application
+  sarpebe-backend/    API, worker, migrations, evaluation harness
+  docs/               detailed documentation
+  .claude/            project instructions and code rules for AI coding assistants
+  README.md           this file
+```
 
-**Curriculum-Grounded Generation**
-Lesson plans are generated using RAG. PDFs are read with table-aware extraction; retrieval combines vector and keyword search, drops weak matches and reranks the rest. If the documents do not cover the topic, generation stops instead of inventing content. References are built by the server from the passages the model used, so a citation cannot be fabricated. The output is checked (table shape, minutes per meeting, source ids) and repaired once if needed.
+The two applications are independent: each has its own dependencies and configuration, and they communicate only over HTTP.
 
-**Measured Quality**
-Offline evaluations (`python -m evals.run`) report retrieval hit rate and the right similarity floor, plus schema-valid, repair and grounding rates for real generations. Prompt and schema changes are versioned and compared against them. See [AI pipeline](sarpebe-backend/docs/AI.md).
+## Quick start
 
-**Asynchronous Processing**
-AI generation takes about 20–60 seconds. The API immediately returns `202 Accepted` with a `job_id`. A Celery worker handles the generation in the background and records its stage (retrieving, drafting, repairing). The frontend follows the job until the plan is ready.
+Prerequisites: Python 3.11+, Node.js 20+, pnpm, Redis, a Supabase project (with the `vector` extension and a public Storage bucket `sarpebe-storage`), and a Gemini API key.
 
-**Cost Observability**
-Every call to the Gemini API records `prompt_tokens`, `completion_tokens`, and the calculated fiat cost to the database, enabling usage and cost analytics.
+```bash
+# backend, from sarpebe-backend/
+python -m venv .venv && .venv\Scripts\activate      # Unix: source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env                                # fill in the values
+alembic upgrade head
+python -m scripts.seed_users                        # an admin and a teacher
+uvicorn app.main:app --reload --port 8000
+celery -A app.tasks.celery_app worker --loglevel=info    # second terminal
 
-**Multi-Tenant Security**
-Every query is scoped to the authenticated user in the repository layer (the API connects with a privileged database role, so Supabase Row Level Security is not relied on). UUIDs are used as primary keys to prevent ID enumeration attacks.
+# frontend, from sarpebe-frontend/
+pnpm install
+cp .env.local.example .env.local                    # fill in NEXTAUTH_SECRET
+pnpm dev
+```
 
----
-
-## Getting Started
-
-Refer to the individual README files for setup instructions:
-
-- [Frontend Setup](sarpebe-frontend/README.md)
-- [Backend Setup](sarpebe-backend/README.md)
-
----
+Open http://localhost:3000. The full walkthrough, including uploading a first document and generating a plan, is in [docs/getting-started.md](docs/getting-started.md).
 
 ## Documentation
 
-- [Backend Engineering Directives](sarpebe-backend/AGENTS.md)
-- [AI Pipeline: RAG, prompts, evaluations](sarpebe-backend/docs/AI.md)
-- [Database Schema & Architecture](sarpebe-backend/docs/DATABASE.md)
+All detailed documentation is in [docs/](docs/README.md):
+
+| Document | Contents |
+|---|---|
+| [Architecture](docs/architecture.md) | System, layers, end-to-end flows. |
+| [Getting started](docs/getting-started.md) | Setup and first lesson plan. |
+| [Configuration](docs/configuration.md) | Every environment variable and constant. |
+| [Operations](docs/operations.md) | Running, deploying, migrating, reindexing, monitoring. |
+| [API reference](docs/api-reference.md) | Endpoints, bodies, error codes. |
+| [Authentication and security](docs/authentication-security.md) | Tokens, sessions, rate limiting, security model. |
+| [AI pipeline](docs/ai-pipeline.md) | Ingestion, retrieval, generation, checks, failures, costs, export. |
+| [AI evaluation](docs/ai-evaluation.md) | Measuring retrieval and generation quality. |
+| [Database](docs/database.md) | Schema, indexes, migrations. |
+| [Frontend](docs/frontend.md) | Routes, data flow, editors. |
+| [Design system](docs/design-system.md) | Visual language, motion, copy. |
+| [Testing](docs/testing.md) | Running and writing tests. |
+| [Troubleshooting](docs/troubleshooting.md) | Common problems and fixes. |
+
+Application READMEs: [sarpebe-backend/README.md](sarpebe-backend/README.md), [sarpebe-frontend/README.md](sarpebe-frontend/README.md).
+
+## Contributing
+
+Use Conventional Commits (`feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf` with scopes `frontend`, `backend`, `db`, `api`, `rag`, `auth`, `docs`). Run `pytest` for backend changes and `npx tsc --noEmit`, `pnpm lint`, `pnpm build` for frontend changes. Never commit `.env` files or secrets. Code conventions are in `.claude/rules/`.

@@ -1,174 +1,52 @@
 # SARPEBE Frontend
-**Next.js Web Application**
 
-The frontend for SARPEBE is the primary user interface for Indonesian educators. It enables teachers to generate curriculum-aligned lesson plans, manage their history of generated plans, and upload official curriculum documents for the AI engine to reference.
+Next.js web application for SARPEBE: landing page, account flows, lesson plan creation with live progress, a full Modul Ajar editor with editable tables and PDF export, and curriculum document management for administrators. All text is Indonesian.
 
----
+This file is a short orientation. The full documentation is in the repository's [docs](../docs/README.md) folder.
 
-## Tech Stack
+## Stack
 
-| Technology | Version | Purpose |
-|---|---|---|
-| Next.js | 16.x | React framework with App Router |
-| React | 19.x | UI component library |
-| TypeScript | 5.x | Static type checking |
-| Tailwind CSS | 4.x | Utility-first styling |
-| ESLint | 9.x | Code linting |
-| pnpm | latest | Package manager |
+Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4, shadcn/ui primitives, TanStack Query, NextAuth 4 (credentials), Zod 4, axios, lucide-react, pnpm.
 
----
-
-## Project Structure
-
-The project follows a layered architecture where each directory has a single, clearly defined responsibility. No layer skips past the one below it.
+## Layout
 
 ```
 sarpebe-frontend/
-├── app/                        # Next.js App Router — pages and layouts
-│   ├── layout.tsx              # Root layout: fonts, global providers
-│   ├── page.tsx                # Landing / marketing page
-│   ├── (auth)/                 # Auth route group (no dashboard shell)
-│   │   ├── login/page.tsx
-│   │   └── register/page.tsx
-│   └── (dashboard)/            # Protected route group with dashboard shell
-│       ├── layout.tsx          # Dashboard layout: sidebar, topbar
-│       ├── lesson-plans/
-│       │   ├── page.tsx        # List all lesson plans (paginated)
-│       │   ├── [id]/page.tsx   # View a single generated lesson plan
-│       │   └── new/page.tsx    # Form to generate a new lesson plan
-│       └── curriculum/
-│           └── page.tsx        # Upload and manage curriculum documents
-│
-├── components/
-│   ├── ui/                     # Primitive, reusable UI components (DRY base layer)
-│   │   ├── Button.tsx
-│   │   ├── Input.tsx
-│   │   ├── Badge.tsx
-│   │   ├── Card.tsx
-│   │   ├── Modal.tsx
-│   │   └── Spinner.tsx
-│   ├── layout/                 # Structural shell components
-│   │   ├── Sidebar.tsx
-│   │   ├── Topbar.tsx
-│   │   └── PageHeader.tsx
-│   └── features/               # Feature-specific components composed from ui/
-│       ├── lesson-plans/
-│       │   ├── LessonPlanCard.tsx
-│       │   ├── LessonPlanList.tsx
-│       │   ├── LessonPlanEditor.tsx    # schema_version 1 plans
-│       │   ├── LessonPlanEditorV2.tsx  # full Modul Ajar with editable tables
-│       │   └── GenerationProgress.tsx  # real backend stages
-│       └── curriculum/
-│           └── DocumentUploader.tsx
-│
-├── lib/
-│   ├── api/                    # All HTTP calls to the backend (centralized)
-│   │   ├── client.ts           # Base HTTP client: base URL, auth headers, error handling
-│   │   ├── lesson-plans.ts     # Lesson plan API functions
-│   │   └── curriculum.ts      # Curriculum document API functions
-│   ├── hooks/                  # Custom React hooks (abstract data fetching from UI)
-│   │   ├── useLessonPlans.ts   # List/detail/mutations (TanStack Query)
-│   │   ├── useCurriculum.ts
-│   │   └── useJobStatus.ts     # SSE with polling fallback until generation completes
-│   ├── stores/                 # Global client state (Zustand or React Context)
-│   │   └── auth-store.ts
-│   └── utils/
-│       ├── formatters.ts       # Date, number, token count display helpers
-│       └── validators.ts       # Shared Zod schemas for form + API validation
-│
-├── types/                      # Global TypeScript interfaces (single source of truth)
-│   ├── lesson-plan.ts
-│   ├── curriculum.ts
-│   └── api.ts                  # Generic API response, pagination, and error types
-│
-└── public/                     # Static assets
+  app/                 pages and layouts: (auth), (dashboard), landing, NextAuth route
+  components/
+    ui/                primitives (Button, Field, Select, Textarea, Notice, EditableTable, ...)
+    features/          auth, curriculum, lesson-plans (editors, progress, list)
+    brand/             notebook-paper design pieces (Sheet, Mark, HeaderShell, ...)
+    landing/           landing page sections
+  lib/
+    api/               axios client and one file per resource
+    hooks/             TanStack Query hooks, job tracking (SSE with polling fallback)
+    utils/             validators (Zod), errors, fase, lesson plan helpers
+  types/               types mirroring backend schemas
+  proxy.ts             route protection (session and admin role)
 ```
 
----
+Layers: Page -> Hook -> API client -> backend. See [frontend](../docs/frontend.md).
 
-## Layered Architecture
-
-```
-Page (app/)
-  |
-  | uses
-  v
-Custom Hook (lib/hooks/)
-  |
-  | calls
-  v
-API Client (lib/api/)
-  |
-  | HTTP
-  v
-Backend API (sarpebe-backend)
-```
-
-Pages never call `lib/api` directly. Hooks manage all data fetching and state, keeping pages clean and declarative.
-
----
-
-## DRY Principles Applied
-
-- `lib/api/client.ts` is the single HTTP client instance. Auth headers, base URL, and global error handling are defined once — never repeated across individual API files.
-- `types/` act as the single source of truth for data shapes, shared by pages, hooks, components, and API functions alike.
-- `components/ui/` provides base UI primitives. Feature components compose from them rather than re-implementing styles or behaviors.
-- `lib/utils/validators.ts` centralizes Zod schemas so the same validation rules apply to both form submission and API request payloads.
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 20+
-- pnpm
-
-### Installation
+## Run it
 
 ```bash
-cd sarpebe-frontend
 pnpm install
+cp .env.local.example .env.local     # NEXT_PUBLIC_API_BASE_URL, NEXTAUTH_URL, NEXTAUTH_SECRET
+pnpm dev                             # http://localhost:3000
 ```
 
-### Environment Variables
+The backend must be running (see the [backend README](../sarpebe-backend/README.md)). Checks: `npx tsc --noEmit`, `pnpm lint`, `pnpm build`.
 
-Copy the example file and fill in the values:
+## More
 
-```bash
-cp .env.local.example .env.local
-```
-
-| Variable | Description |
+| Topic | Document |
 |---|---|
-| `NEXT_PUBLIC_API_BASE_URL` | Base URL of the SARPEBE backend API |
-| `NEXTAUTH_URL` | Public URL of the frontend (e.g. `http://localhost:3000`) |
-| `NEXTAUTH_SECRET` | Secret used to sign the NextAuth session cookie |
+| Routes, data flow, editors | [frontend](../docs/frontend.md) |
+| Visual language, motion, copy | [design-system](../docs/design-system.md) |
+| Sessions and tokens | [authentication-security](../docs/authentication-security.md) |
+| API the app calls | [api-reference](../docs/api-reference.md) |
+| Environment variables | [configuration](../docs/configuration.md) |
+| Problems | [troubleshooting](../docs/troubleshooting.md) |
 
-### Running the Development Server
-
-```bash
-pnpm dev
-```
-
-The application will be available at [http://localhost:3000](http://localhost:3000).
-
-### Building for Production
-
-```bash
-pnpm build
-pnpm start
-```
-
-### Linting
-
-```bash
-pnpm lint
-```
-
----
-
-## Related
-
-- [Main Repository README](../README.md)
-- [Backend — sarpebe-backend](../sarpebe-backend/README.md)
+Project overview: [root README](../README.md).

@@ -1,233 +1,59 @@
 # SARPEBE Backend
-**FastAPI REST API**
 
-The backend for SARPEBE is a high-performance, asynchronous REST API that handles all business logic, RAG orchestration, AI generation, and database operations. It is designed for a multi-user environment with strict security, cost observability, and non-blocking AI processing.
+FastAPI REST API, Celery worker, migrations and evaluation harness for SARPEBE. It handles authentication, curriculum ingestion, retrieval-augmented generation of lesson plans with Google Gemini, PDF export, and cost logging.
 
----
+This file is a short orientation. The full documentation is in the repository's [docs](../docs/README.md) folder.
 
-## Tech Stack
+## Stack
 
-| Technology | Version | Purpose |
-|---|---|---|
-| FastAPI | latest | Async HTTP API framework |
-| Python | 3.11+ | Runtime |
-| Supabase | — | PostgreSQL database + file Storage (authentication is handled by this backend) |
-| pgvector | — | Vector similarity search extension |
-| Google Gemini API | — | LLM generation + text embeddings |
-| SQLAlchemy | 2.0 | Async ORM |
-| Alembic | latest | Database migrations |
-| Celery | latest | Background task queue |
-| Redis | latest | Celery broker + result backend |
-| Pydantic | v2 | Request/response validation |
+FastAPI, Python 3.11+, Pydantic v2, SQLAlchemy 2.0 (async), Alembic, Supabase PostgreSQL with pgvector, Supabase Storage, Celery and Redis, Google GenAI SDK, pdfplumber and pypdf, fpdf2.
 
----
-
-## Project Structure
-
-The project follows Clean Architecture with strict layer separation. Each layer is allowed to talk only to the layer directly below it.
+## Layout
 
 ```
 sarpebe-backend/
-├── app/
-│   ├── main.py                     # App entrypoint: registers routers, middleware, lifespan
-│   ├── config.py                   # Centralized settings via pydantic-settings (reads .env)
-│   ├── api/
-│   │   ├── deps.py                 # Shared FastAPI Depends(): get_db, get_current_user
-│   │   ├── router.py               # Router aggregation
-│   │   └── routers/                # HTTP endpoint definitions
-│   │       ├── users.py            # /users — profile management
-│   │       ├── lesson_plans.py     # /lesson-plans — CRUD + generation trigger
-│   │       └── curriculum.py       # /curriculum — document upload and management
-│   ├── core/
-│   │   ├── security.py             # Password hashing, access-token (JWT) create/verify, opaque token hashing
-│   │   ├── exceptions.py           # App-wide custom exception classes
-│   │   └── services/               # Business logic layer (no SQL, no HTTP here)
-│   │       ├── embedding_service.py    # Generates Gemini text embeddings
-│   │       ├── rag_service.py          # Retrieval: pre-filter, hybrid search, rerank (see retrieval/)
-│   │       ├── ingestion_service.py    # PDF -> chunks -> embeddings
-│   │       ├── llm_service.py          # Structured generation, one repair call, server-side checks
-│   │       ├── lesson_plan_checks.py   # Time sums, table shape, source ids, server-built references
-│   │       └── lesson_plan_service.py  # Coordinates RAG + generation flow
-│   ├── db/
-│   │   ├── session.py              # AsyncEngine + AsyncSession factory
-│   │   └── repositories/           # Pure DB access (CRUD + pgvector queries)
-│   │       ├── base_repository.py      # Generic CRUD — shared by all repositories (DRY)
-│   │       ├── user_repository.py
-│   │       ├── lesson_plan_repository.py
-│   │       └── document_chunk_repository.py
-│   ├── schemas/                    # Pydantic V2 I/O models
-│   │   ├── common.py               # Shared types: pagination, base API response
-│   │   ├── user.py
-│   │   ├── lesson_plan.py
-│   │   └── curriculum.py
-│   ├── tasks/                      # Celery async task definitions
-│   │   ├── celery_app.py           # Celery app factory and configuration
-│   │   └── generation_tasks.py     # Async lesson plan generation task
-│   └── utils/                      # Pure utility functions (no business logic)
-│       ├── chunking.py             # Semantic text chunking by logical boundaries
-│       └── cost_calculator.py      # Token-to-fiat cost formula
-├── alembic/                        # Alembic migration environment
-│   └── versions/                   # Auto-generated migration scripts
-├── tests/
-│   ├── unit/                       # Unit tests per service/repository
-│   └── integration/                # End-to-end API tests
-├── docs/
-│   └── DATABASE.md                 # Full database schema and architecture
-├── AGENTS.md                       # AI engineering directives
-├── .env.example
-├── requirements.txt
-└── Dockerfile
+  app/
+    api/            routers and dependencies (HTTP only)
+    core/           security, rate limiting, storage, llm_client, prompts, services/
+    db/             session, models, repositories
+    schemas/        Pydantic request, response and content models
+    tasks/          Celery app, generation and ingestion tasks
+    utils/          PDF reading, chunking, labels, fase, cost math, PDF export
+    assets/fonts/   bundled DejaVu fonts for PDF export
+  alembic/          migrations
+  evals/            offline evaluation harness
+  scripts/          seed_users, create_user, upgrade_user, reindex_documents
+  tests/            unit and integration tests
 ```
 
----
+Layers: Router -> Service -> Repository -> Database. See [architecture](../docs/architecture.md).
 
-## Layered Architecture
-
-```
-Router (api/routers/)
-  |
-  | calls
-  v
-Service (core/services/)
-  |
-  | calls
-  v
-Repository (db/repositories/)
-  |
-  | SQL / pgvector
-  v
-Supabase — PostgreSQL + pgvector
-```
-
-Routers handle HTTP concerns only (validation, auth injection, response formatting). Services contain all business logic. Repositories contain all database access. No layer skips another.
-
----
-
-## DRY Principles Applied
-
-- `base_repository.py` implements generic `get`, `get_multi`, `create`, `update`, and `delete` methods. Domain-specific repositories inherit from it and only add their own specialized queries.
-- `api/deps.py` centralizes all `Depends()` declarations. Auth checks and DB session injection are never duplicated across routers.
-- `config.py` is the single source of truth for all environment variables. Nothing reads from `os.environ` directly — everything goes through the settings object.
-- `schemas/common.py` defines shared Pydantic types (paginated responses, base error models) used across all endpoints.
-- `utils/cost_calculator.py` centralizes the token-to-cost formula so it cannot diverge between generation and embedding operations.
-
----
-
-## Key Engineering Decisions
-
-**Async LLM Processing**
-Generation takes about 20–60 seconds. Routers immediately return `202 Accepted` with a `job_id`. Celery workers execute the RAG pipeline and generation in the background. Clients follow the job status (SSE, or polling) until the result is ready.
-
-**RAG Pre-Filtering and Hybrid Retrieval**
-Every search is preceded by a SQL `WHERE` clause filtering by `grade_level` and `subject`. Within that set, vector and Indonesian full-text candidates are fused (reciprocal rank fusion), cut by a similarity floor, and reranked by a small model. If nothing is relevant the job stops before any generation call. See [docs/AI.md](docs/AI.md) for the whole pipeline, prompts, and how to evaluate changes.
-
-**Commit Before Dispatch**
-Celery tasks are dispatched only after the lesson plan / document row is committed, so the worker never races the request transaction. Job status is read from the database row rather than Celery's result backend.
-
-**Connection Pooling**
-In production, the app connects to Supabase via the Supavisor connection pooler (port 6543, transaction mode) rather than directly to PostgreSQL. SQLAlchemy's `pool_size` and `max_overflow` are tuned to match the pooler's capacity.
-
-**Cost Logging**
-Every call to the Gemini API — whether for generation or embedding — records `prompt_tokens`, `completion_tokens`, `operation_type`, and `total_cost` in the `llm_cost_logs` table, enabling per-user billing and spend analytics.
-
----
-
-## Database Schema
-
-Refer to [docs/DATABASE.md](docs/DATABASE.md) for the full ERD, table definitions, index strategy, Row Level Security policies, and architectural trade-off rationale.
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- Python 3.11+
-- Redis (for Celery)
-- A Supabase project with `pgvector` extension enabled
-
-### Installation
+## Run it
 
 ```bash
-cd sarpebe-backend
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
+python -m venv .venv && .venv\Scripts\activate     # Unix: source .venv/bin/activate
 pip install -r requirements.txt
-```
-
-### Environment Variables
-
-```bash
-cp .env.example .env
-```
-
-| Variable | Description |
-|---|---|
-| `DATABASE_URL` | Supabase PostgreSQL connection string (Supavisor port 6543) |
-| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Supabase project, used for Storage only |
-| `AUTH_JWT_SECRET` | Signs access tokens (at least 32 characters, keep secret; changing it signs everyone out). Generate with `python -c "import secrets; print(secrets.token_urlsafe(48))"` |
-| `ACCESS_TOKEN_TTL_MINUTES` / `REFRESH_TOKEN_TTL_DAYS` | Token lifetimes (default 15 minutes / 14 days) |
-| `REQUIRE_EMAIL_VERIFICATION` | `true` (default) blocks login until the email link is opened |
-| `FRONTEND_URL` | Base URL used in emailed links (default `http://localhost:3000`) |
-| `EMAIL_BACKEND` | `console` (default; logs emails, development only) or `smtp` |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_USE_STARTTLS` | SMTP settings when `EMAIL_BACKEND=smtp` |
-| `CORS_ORIGINS` | JSON list of allowed browser origins (default `["http://localhost:3000"]`) |
-| `GEMINI_API_KEY` | Google Gemini API key |
-| `REDIS_URL` | Redis connection URL for Celery |
-| `GEMINI_EMBEDDING_MODEL` | Embedding model name (e.g. `text-embedding-004`) |
-| `GEMINI_GENERATION_MODEL` | Generation model name (e.g. `gemini-1.5-pro`) |
-
-### Running Database Migrations
-
-```bash
+cp .env.example .env                               # required: DATABASE_URL, SUPABASE_*, GEMINI_API_KEY, REDIS_URL, AUTH_JWT_SECRET
 alembic upgrade head
-```
-
-### Seeding Users
-
-Creates one admin (`admin@example.com`) and one teacher (`guru@example.com`), both email-verified. It is safe to run repeatedly: existing accounts are left unchanged unless `--reset-passwords` is passed.
-
-```bash
 python -m scripts.seed_users
-```
-
-Set `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_USER_EMAIL` and `SEED_USER_PASSWORD` (environment or `.env`) to choose the accounts. A password you do not provide is generated and printed once for newly created accounts; there are no built-in default passwords. For a single ad-hoc account use `python -m scripts.create_user <email> <password> --role admin`.
-
-### Running the API Server
-
-```bash
-uvicorn app.main:app --reload --port 8000
-```
-
-The API will be available at [http://localhost:8000](http://localhost:8000).  
-Interactive docs: [http://localhost:8000/docs](http://localhost:8000/docs)
-
-### Running the Celery Worker
-
-```bash
+uvicorn app.main:app --reload --port 8000          # docs at http://localhost:8000/docs
 celery -A app.tasks.celery_app worker --loglevel=info
 ```
 
----
+Run the tests with `pytest` (no network, Gemini key, Redis or PostgreSQL needed).
 
-## API Endpoints (Overview)
+## More
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/auth/login` | Authenticate and receive JWT |
-| `GET` | `/api/users/me` | Get current user profile |
-| `GET` | `/api/lesson-plans` | List lesson plans (paginated) |
-| `POST` | `/api/lesson-plans` | Trigger async lesson plan generation |
-| `GET` | `/api/lesson-plans/{id}` | Get a single lesson plan |
-| `GET` | `/api/lesson-plans/jobs/{job_id}` | Poll background job status |
-| `POST` | `/api/curriculum/upload` | Upload a curriculum document (PDF) |
-| `GET` | `/api/curriculum` | List uploaded curriculum documents |
+| Topic | Document |
+|---|---|
+| Setup walkthrough | [getting-started](../docs/getting-started.md) |
+| Every setting | [configuration](../docs/configuration.md) |
+| Endpoints and error codes | [api-reference](../docs/api-reference.md) |
+| Tokens and security | [authentication-security](../docs/authentication-security.md) |
+| RAG, prompts, generation | [ai-pipeline](../docs/ai-pipeline.md), [ai-evaluation](../docs/ai-evaluation.md) |
+| Schema and migrations | [database](../docs/database.md) |
+| Running in production | [operations](../docs/operations.md) |
+| Tests | [testing](../docs/testing.md) |
+| Problems | [troubleshooting](../docs/troubleshooting.md) |
 
----
-
-## Related
-
-- [Main Repository README](../README.md)
-- [Frontend — sarpebe-frontend](../sarpebe-frontend/README.md)
-- [Database Schema](docs/DATABASE.md)
-- [Engineering Directives](AGENTS.md)
+Frontend: [sarpebe-frontend](../sarpebe-frontend/README.md). Project overview: [root README](../README.md).

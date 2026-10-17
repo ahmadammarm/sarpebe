@@ -1,123 +1,75 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code when working in this repository. This is the only instruction file; code rules are in `.claude/rules/` and human documentation is in `docs/`.
 
-## Repository Overview
+## Repository overview
 
-SARPEBE (Sistem Automasi Rencana Pembelajaran Berbasis Kurikulum) is an educational platform that automates curriculum-aligned lesson plan generation for Indonesian educators using Retrieval-Augmented Generation (RAG) powered by Google Gemini.
+SARPEBE (Sistem Automasi Rencana Pembelajaran Berbasis Kurikulum) generates curriculum-aligned lesson plans (Modul Ajar, Kurikulum Merdeka) for Indonesian teachers. It uses Retrieval-Augmented Generation over official curriculum PDFs (CP, ATP, Buku Guru) with Google Gemini, and every learning objective is traceable to a source page.
 
-This repository is a monorepo containing two decoupled applications:
-- `sarpebe-frontend`: Next.js 16 web interface (App Router, React 19, TypeScript, Tailwind CSS 4, shadcn/ui).
-- `sarpebe-backend`: FastAPI REST API (Python 3.11+, SQLAlchemy 2.0, Supabase PostgreSQL with pgvector, Celery + Redis, Google GenAI SDK).
+A monorepo with two decoupled applications that talk only over HTTP:
 
-Each application manages its own dependencies, configuration, and environment. Never introduce shared source code or shared dependencies at the monorepo root.
+- `sarpebe-frontend`: Next.js 16 (App Router, React 19, TypeScript, Tailwind CSS 4, shadcn/ui, TanStack Query, NextAuth).
+- `sarpebe-backend`: FastAPI (Python 3.11+, SQLAlchemy 2.0 async, Supabase PostgreSQL with pgvector, Celery + Redis, Google GenAI SDK).
 
----
+Each application manages its own dependencies, configuration and environment. Never add shared source code or shared dependencies at the monorepo root.
 
-## Development Commands
+The root contains only `README.md`. Detailed documentation lives in `docs/` (index: `docs/README.md`).
 
-### Backend (`sarpebe-backend/`)
+## Development commands
 
-Commands are run from the `sarpebe-backend/` directory:
+### Backend (run from `sarpebe-backend/`)
 
-- **Virtual Environment Setup**:
-  - Windows: `python -m venv .venv && .venv\Scripts\activate`
-  - Unix: `python -m venv .venv && source .venv/bin/activate`
-- **Install Dependencies**: `pip install -r requirements.txt`
-- **Run Migrations**: `alembic upgrade head`
-- **Create New Migration**: `alembic revision --autogenerate -m "<migration_description>"`
-- **Start API Server**: `uvicorn app.main:app --reload --port 8000`
-- **Start Celery Worker**: `celery -A app.tasks.celery_app worker --loglevel=info`
-- **Run All Tests**: `pytest`
-- **Run Test Directory**: `pytest tests/unit` or `pytest tests/integration`
-- **Run Single Test File**: `pytest tests/unit/test_chunking.py`
-- **Run Specific Test Function**: `pytest tests/unit/test_chunking.py -k <test_function_name>`
+- Virtual environment: Windows `python -m venv .venv && .venv\Scripts\activate`; Unix `python -m venv .venv && source .venv/bin/activate`
+- Install: `pip install -r requirements.txt`
+- Migrations: `alembic upgrade head`; new: `alembic revision --autogenerate -m "<description>"`
+- API: `uvicorn app.main:app --reload --port 8000`
+- Worker: `celery -A app.tasks.celery_app worker --loglevel=info`
+- Tests: `pytest`, `pytest tests/unit`, `pytest tests/integration`, `pytest tests/unit/test_chunking.py -k <name>`
+- Accounts: `python -m scripts.seed_users`, `scripts.create_user`, `scripts.upgrade_user`
+- Reindex documents: `python -m scripts.reindex_documents [--all | --id <uuid>]`
+- AI evaluations (cost tokens, run only when asked): `python -m evals.run questions|retrieval|generation`
 
-### Frontend (`sarpebe-frontend/`)
+### Frontend (run from `sarpebe-frontend/`, with `pnpm`)
 
-Commands are run from the `sarpebe-frontend/` directory using `pnpm`:
+- Install: `pnpm install`; dev server: `pnpm dev` (port 3000); build: `pnpm build`; start: `pnpm start`; lint: `pnpm lint`; types: `npx tsc --noEmit`
 
-- **Install Dependencies**: `pnpm install`
-- **Start Development Server**: `pnpm dev` (runs on `http://localhost:3000`)
-- **Build for Production**: `pnpm build`
-- **Start Production Server**: `pnpm start`
-- **Lint Code**: `pnpm lint`
-
----
-
-## High-Level Architecture & Layering
-
-Both applications enforce strict layered architecture where a layer may only call the layer immediately below it.
-
-### Backend Architecture
+## Architecture in brief
 
 ```
-Router (app/api/routers/)
-    | HTTP concerns: request parsing, dependency injection, status codes
-    v
-Service (app/core/services/)
-    | Business logic, RAG coordination, Gemini LLM calls, cost logging
-    v
-Repository (app/db/repositories/)
-    | Database queries (SQLAlchemy ORM + pgvector similarity)
-    v
-Database (Supabase PostgreSQL + pgvector)
+Backend:   Router (app/api/routers) -> Service (app/core/services) -> Repository (app/db/repositories) -> Database
+Frontend:  Page (app) -> Hook (lib/hooks) -> API client (lib/api) -> Backend REST API
 ```
 
-- **Router Layer**: Validates requests and returns HTTP responses. Injects dependencies via `app/api/deps.py` (e.g. `get_db`, `get_current_user`). Never touches database models or executes queries directly.
-- **Service Layer**: Implements core business logic. Coordinates RAG, handles document chunking, calls Gemini API, and tracks token costs. Never accesses database without a repository.
-- **Repository Layer**: Subclasses `BaseRepository` (`app/db/repositories/base_repository.py`) for generic CRUD. Custom queries (e.g., vector similarity search) live exclusively in domain-specific repositories.
-- **Authentication**: The backend owns authentication (`app/api/routers/auth.py`, `app/core/services/auth_service.py`): bcrypt passwords, short-lived HS256 access tokens, rotating single-use refresh tokens, emailed verification and reset links. Supabase is used only for Storage and the Postgres host. Auth endpoints must not reveal whether an email is registered.
-- **Async Tasks**: Long-running generation jobs (10-30 seconds) must run in Celery (`app/tasks/generation_tasks.py`). The API endpoint responds immediately with `202 Accepted` and a `job_id`, and clients poll `/api/lesson-plans/jobs/{job_id}`.
-- **RAG & Vector Search** (details in `sarpebe-backend/docs/AI.md`):
-  - Embedding dimensionality is 768, L2-normalized after truncation; the model name is stored per chunk.
-  - Pre-filtering is required: always filter by normalized `grade_level` and `subject` via SQL before any similarity or keyword ranking.
-  - Retrieval is hybrid: vector (pgvector `<=>`) plus Indonesian full-text candidates, fused by reciprocal rank fusion, cut by `RAG_MIN_SIMILARITY`, then reranked by a small model. If nothing is relevant, stop before generation (`InsufficientContextError`).
-  - Documents are read with table-aware extraction and chunked by structure (headings, tables as their own chunks), not arbitrary character windows.
-  - Prompts: rules only in `system_instruction`; user input and passages are escaped, tagged data. Output shape comes from the Pydantic schema (`response_json_schema`), never a hand-written copy.
-  - Citations are built by the server from passage ids (`S1`...), never trusted as free text from the model. Bump `PROMPT_VERSION` when a prompt or schema changes and run `python -m evals.run ...` before and after.
-- **Database Transactions & Concurrency**:
-  - Multi-write operations must use `async with session.begin():`.
-  - Generation is currently unlimited (the per-tier quota was removed). If a quota is ever reintroduced, deduct it under pessimistic row locking via `.with_for_update()`.
-  - Commit before dispatching a Celery task so the worker is guaranteed to see the row. Job status is derived from the `lesson_plans` row, never from Celery state.
-  - Cost logs are written through `app/core/services/cost_logging.py` in their own session so they survive rollbacks.
-  - Celery tasks must create their DB engine inside `asyncio.run()` via `task_session_scope()` (`app/db/session.py`).
-  - Every Gemini API call must log token counts and calculated cost to `llm_cost_logs` using `app/utils/cost_calculator.py`.
+A layer calls only the layer directly below it. Long jobs (generation, ingestion) run in Celery; the API answers `202 Accepted` with a `job_id` and clients follow `/api/lesson-plans/jobs/{job_id}` (SSE with a polling fallback). The backend owns authentication (bcrypt, short-lived JWT access tokens, rotating single-use refresh tokens); Supabase provides only Postgres and Storage. Retrieval is hybrid (vector plus Indonesian full-text, fused, filtered by a similarity floor, reranked); generation uses a Pydantic-derived JSON schema, server-side checks, one repair call, and server-built references. Plans carry a `schema_version` (1 short, 2 full Modul Ajar). Details: `docs/architecture.md`, `docs/ai-pipeline.md`.
 
-### Frontend Architecture
+## Rules
 
-```
-Page (app/)
-    | App Router routing, layout assembly, trigger hooks
-    v
-Custom Hook (lib/hooks/)
-    | TanStack Query data fetching, state, polling, mutations
-    v
-API Client (lib/api/)
-    | Centralized HTTP client (client.ts), authentication headers, error handling
-    v
-Backend REST API
-```
+Detailed code rules are in `.claude/rules/`. Read the relevant files before changing code in that area, and update them in the same change when a convention changes.
 
-- **Page Layer**: Assembles layout and feature components. Must not make direct `fetch()` or API client calls.
-- **Hook Layer**: Encapsulates server state and side effects using TanStack Query. Provides job tracking (`useJobStatus.ts`: authenticated SSE with a polling fallback) for async generation jobs.
-- **API Client Layer**: `lib/api/client.ts` is the single entry point for backend requests, injecting authentication tokens and handling base URL configurations.
-- **State Management**:
-  - Server state: TanStack Query inside `lib/hooks/`.
-  - Client/UI state: Zustand stores inside `lib/stores/`.
-- **Validation**: Shared Zod schemas in `lib/utils/validators.ts` drive both client-side form validation and TypeScript type inferences (`z.infer<...>`).
-- **Type Safety**: Centralized interfaces live in `types/` and must mirror backend schemas. Avoid `any`.
+| Rule file | Read it when |
+|---|---|
+| `rules/backend-pattern.md` | Writing or changing any Python under `sarpebe-backend/app`, scripts, or tasks: layers, dependencies, errors, transactions, Celery. |
+| `rules/frontend-pattern.md` | Writing or changing anything under `sarpebe-frontend/`: layers, hooks, API client, types, Zod, components, server versus client modules. |
+| `rules/ai-pipeline.md` | Touching ingestion, retrieval, prompts, schemas, generation, cost logging, or evals. |
+| `rules/database-migrations.md` | Changing models, migrations, indexes, pgvector or full-text queries. |
+| `rules/testing.md` | Before finishing any change: what to run, how tests are built, what must never run in tests. |
+| `rules/security-auth.md` | Touching accounts, tokens, sessions, uploads, secrets, authorization. |
+| `rules/design-system.md` | Any UI work: tokens, components, responsiveness, motion, accessibility, Indonesian copy. |
+| `rules/git-workflow.md` | Staging, committing, or pushing: message format, scopes, what never to commit, no AI attribution. |
 
----
+## Documentation
 
-## Commit Conventions
+`docs/` holds the human documentation: `architecture.md`, `getting-started.md`, `configuration.md`, `operations.md`, `api-reference.md`, `authentication-security.md`, `ai-pipeline.md`, `ai-evaluation.md`, `database.md`, `frontend.md`, `design-system.md`, `testing.md`, `troubleshooting.md`. Update the matching document in the same change as the code (new endpoint, new setting, schema change, prompt or retrieval change). Write documentation without emojis, and keep each fact in one place with links elsewhere.
 
-Use Conventional Commits:
-`<type>(<scope>): <short description>`
+## Working agreements with this user
 
-- **Types**: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`
-- **Scopes**: `frontend`, `backend`, `db`, `api`, `rag`, `auth`, `docs`
-- **Examples**:
-  - `feat(backend): add async lesson plan generation endpoint`
-  - `fix(frontend): handle job polling exponential backoff`
-  - `refactor(backend): use BaseRepository for curriculum queries`
+- Respond in Indonesian unless asked otherwise. All user-facing application text is Indonesian.
+- Ask clarifying questions first when the user says "berikan saya pertanyaan dulu" or "sebelum itu buatkan pertanyaan".
+- Do not start dev servers or take screenshots unless asked; writing code and running `pytest`, `tsc`, `eslint` and builds is fine.
+- Never run migrations or write to the user's database without being asked; read-only diagnostic queries are fine. Do not edit the user's `.env` or `.env.local`; add variables to the `.env.example` files and say what to set.
+- Commit and push only when asked, in logical Conventional Commits, and never mention an AI assistant in commit messages or pull request text (see `rules/git-workflow.md`).
+- Do not use emojis in code, documentation, or user-facing text.
+
+## Commit conventions
+
+`<type>(<scope>): <short description>` with types `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf` and scopes `frontend`, `backend`, `db`, `api`, `rag`, `auth`, `docs`. Examples: `feat(backend): add async lesson plan generation endpoint`, `fix(frontend): handle job polling exponential backoff`, `refactor(backend): use BaseRepository for curriculum queries`.
