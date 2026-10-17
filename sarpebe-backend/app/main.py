@@ -7,10 +7,16 @@ from app.config import settings
 from app.core.exceptions import (
     AppError,
     DocumentNotFoundError,
+    EmailNotVerifiedError,
+    InvalidAccessTokenError,
+    InvalidCredentialsError,
+    InvalidEmailTokenError,
+    InvalidRefreshTokenError,
     InvalidStateError,
     InvalidUploadError,
     LessonPlanNotFoundError,
     NotOwnerError,
+    TooManyAttemptsError,
 )
 from app.db.session import engine
 
@@ -43,13 +49,24 @@ ERROR_STATUS_CODES: dict[type[AppError], int] = {
     NotOwnerError: 403,
     InvalidStateError: 409,
     InvalidUploadError: 400,
+    InvalidEmailTokenError: 400,
+    InvalidCredentialsError: 401,
+    InvalidAccessTokenError: 401,
+    InvalidRefreshTokenError: 401,
+    EmailNotVerifiedError: 403,
+    TooManyAttemptsError: 429,
 }
 
 
 @app.exception_handler(AppError)
 async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     status_code = ERROR_STATUS_CODES.get(type(exc), 400)
-    return JSONResponse(status_code=status_code, content={"detail": exc.message})
+    headers = {"WWW-Authenticate": "Bearer"} if status_code == 401 else None
+    return JSONResponse(
+        status_code=status_code,
+        content={"detail": exc.message, "code": exc.code},
+        headers=headers,
+    )
 
 
 # Register all API routes

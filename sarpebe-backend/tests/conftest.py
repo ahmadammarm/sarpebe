@@ -1,3 +1,10 @@
+import os
+
+# Must be set before the app (and its Settings) is imported; takes priority over .env.
+os.environ["AUTH_JWT_SECRET"] = "test-secret-test-secret-test-secret-0123456789"
+os.environ["EMAIL_BACKEND"] = "console"
+os.environ["REQUIRE_EMAIL_VERIFICATION"] = "true"
+
 import pytest
 from unittest.mock import AsyncMock
 from httpx import AsyncClient, ASGITransport

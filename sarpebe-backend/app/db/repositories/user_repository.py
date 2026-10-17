@@ -6,11 +6,16 @@ from app.db.repositories.base_repository import BaseRepository
 class UserRepository(BaseRepository[Profile, dict, dict]):
     def __init__(self):
         super().__init__(Profile)
-    
+
+    async def get_by_email(self, db: AsyncSession, email: str) -> Profile | None:
+        """Looks up a profile by its (already normalized) email address."""
+        result = await db.execute(select(self.model).filter(self.model.email == email))
+        return result.scalar_one_or_none()
+
     async def get_by_id_for_update(self, db: AsyncSession, id: str) -> Profile | None:
         """
         Fetches a profile and explicitly locks the row using SELECT ... FOR UPDATE.
-        Crucial for preventing race conditions when checking and decrementing quotas.
+        Use when a read-modify-write on the profile must not interleave with another request.
         """
         result = await db.execute(
             select(self.model).filter(self.model.id == id).with_for_update()

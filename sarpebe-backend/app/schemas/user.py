@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict
 
 class ProfileResponse(BaseModel):
     id: UUID
+    email: str | None = None
     full_name: str
     school_name: str | None
     subscription_tier: str
