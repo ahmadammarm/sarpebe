@@ -67,6 +67,7 @@ Database (Supabase PostgreSQL + pgvector)
 - **Router Layer**: Validates requests and returns HTTP responses. Injects dependencies via `app/api/deps.py` (e.g. `get_db`, `get_current_user`). Never touches database models or executes queries directly.
 - **Service Layer**: Implements core business logic. Coordinates RAG, handles document chunking, calls Gemini API, and tracks token costs. Never accesses database without a repository.
 - **Repository Layer**: Subclasses `BaseRepository` (`app/db/repositories/base_repository.py`) for generic CRUD. Custom queries (e.g., vector similarity search) live exclusively in domain-specific repositories.
+- **Authentication**: The backend owns authentication (`app/api/routers/auth.py`, `app/core/services/auth_service.py`): bcrypt passwords, short-lived HS256 access tokens, rotating single-use refresh tokens, emailed verification and reset links. Supabase is used only for Storage and the Postgres host. Auth endpoints must not reveal whether an email is registered.
 - **Async Tasks**: Long-running generation jobs (10-30 seconds) must run in Celery (`app/tasks/generation_tasks.py`). The API endpoint responds immediately with `202 Accepted` and a `job_id`, and clients poll `/api/lesson-plans/jobs/{job_id}`.
 - **RAG & Vector Search**:
   - Embedding dimensionality is 768 (`text-embedding-004`).

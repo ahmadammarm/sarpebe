@@ -21,7 +21,7 @@ The core constraint is: all generated content must be strictly grounded in offic
 | Pydantic | v2 | Request/response validation |
 | SQLAlchemy | 2.0 | Async ORM |
 | Alembic | latest | Database schema migrations |
-| Supabase | — | PostgreSQL host + JWT auth provider |
+| Supabase | — | PostgreSQL host + file Storage (no auth provider; auth lives in this backend) |
 | pgvector | — | Vector similarity search in PostgreSQL |
 | Google GenAI SDK | latest | Gemini generation + text embedding API |
 | Celery | latest | Background task queue for async generation |
@@ -123,7 +123,9 @@ app/
 ### 7. Authentication and Authorization
 
 - All private endpoints must declare `current_user: Profile = Depends(get_current_user)` in their signature.
-- `get_current_user` in `api/deps.py` validates the Supabase JWT and returns the user profile.
+- `get_current_user` in `api/deps.py` verifies the access token issued by `/api/auth/login` (signature, expiry, issuer, type) and loads the profile; a deleted account gets 401.
+- Passwords are bcrypt hashes (`core/security.py`); never log or return `password_hash`. Refresh, verification and reset tokens are random, single-use, and only their SHA-256 is stored.
+- Auth endpoints must not reveal whether an email is registered (register, forgot-password and resend answer identically either way).
 - Never trust client-provided `user_id` in request bodies for write operations. Always derive it from the authenticated token.
 
 ### 8. Error Handling
@@ -165,7 +167,7 @@ app/
 
 ## Security Rules
 
-- Row Level Security (RLS) is enabled in Supabase. The application layer must also enforce ownership — never return rows belonging to another user, even if RLS would catch it.
+- The API connects with a privileged database role, so Row Level Security does not protect these tables. The application layer must enforce ownership — never return rows belonging to another user.
 - UUIDs are used as primary keys across all tables. Never expose sequential integer IDs.
 - Curriculum document uploads must validate MIME type server-side. Do not trust the `Content-Type` header alone.
 

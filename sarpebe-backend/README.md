@@ -11,7 +11,7 @@ The backend for SARPEBE is a high-performance, asynchronous REST API that handle
 |---|---|---|
 | FastAPI | latest | Async HTTP API framework |
 | Python | 3.11+ | Runtime |
-| Supabase | — | PostgreSQL database + JWT Auth |
+| Supabase | — | PostgreSQL database + file Storage (authentication is handled by this backend) |
 | pgvector | — | Vector similarity search extension |
 | Google Gemini API | — | LLM generation + text embeddings |
 | SQLAlchemy | 2.0 | Async ORM |
@@ -39,7 +39,7 @@ sarpebe-backend/
 │   │       ├── lesson_plans.py     # /lesson-plans — CRUD + generation trigger
 │   │       └── curriculum.py       # /curriculum — document upload and management
 │   ├── core/
-│   │   ├── security.py             # JWT validation, Supabase token verification
+│   │   ├── security.py             # Password hashing, access-token (JWT) create/verify, opaque token hashing
 │   │   ├── exceptions.py           # App-wide custom exception classes
 │   │   └── services/               # Business logic layer (no SQL, no HTTP here)
 │   │       ├── embedding_service.py    # Generates Gemini text embeddings
@@ -162,7 +162,14 @@ cp .env.example .env
 | Variable | Description |
 |---|---|
 | `DATABASE_URL` | Supabase PostgreSQL connection string (Supavisor port 6543) |
-| `SUPABASE_JWT_SECRET` | JWT secret from your Supabase project settings |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Supabase project, used for Storage only |
+| `AUTH_JWT_SECRET` | Signs access tokens (at least 32 characters, keep secret; changing it signs everyone out). Generate with `python -c "import secrets; print(secrets.token_urlsafe(48))"` |
+| `ACCESS_TOKEN_TTL_MINUTES` / `REFRESH_TOKEN_TTL_DAYS` | Token lifetimes (default 15 minutes / 14 days) |
+| `REQUIRE_EMAIL_VERIFICATION` | `true` (default) blocks login until the email link is opened |
+| `FRONTEND_URL` | Base URL used in emailed links (default `http://localhost:3000`) |
+| `EMAIL_BACKEND` | `console` (default; logs emails, development only) or `smtp` |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_USE_STARTTLS` | SMTP settings when `EMAIL_BACKEND=smtp` |
+| `CORS_ORIGINS` | JSON list of allowed browser origins (default `["http://localhost:3000"]`) |
 | `GEMINI_API_KEY` | Google Gemini API key |
 | `REDIS_URL` | Redis connection URL for Celery |
 | `GEMINI_EMBEDDING_MODEL` | Embedding model name (e.g. `text-embedding-004`) |

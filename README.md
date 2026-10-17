@@ -45,7 +45,7 @@ Service Layer (Business Logic, RAG Orchestration)
 Repository Layer (Database Queries, pgvector Search)
     |
     v
-Supabase (PostgreSQL + pgvector + Auth)
+Supabase (PostgreSQL + pgvector + Storage)
 ```
 
 Long-running AI generation requests are offloaded to Celery background workers, keeping the API non-blocking. The frontend polls job status until completion.
@@ -63,7 +63,7 @@ Long-running AI generation requests are offloaded to Celery background workers, 
 | AI Engine | Google Gemini API (Pro / Flash + Text Embeddings) |
 | Background Tasks | Celery + Redis |
 | ORM & Migrations | SQLAlchemy 2.0 + Alembic |
-| Auth | Supabase JWT (validated in FastAPI via Depends) |
+| Auth | Backend-issued JWT access tokens + rotating refresh tokens (bcrypt passwords, `/api/auth/*`) |
 
 ---
 
@@ -79,7 +79,7 @@ AI generation can take 10–30 seconds. The API immediately returns `202 Accepte
 Every call to the Gemini API records `prompt_tokens`, `completion_tokens`, and the calculated fiat cost to the database, enabling usage and cost analytics.
 
 **Multi-Tenant Security**
-Supabase Row Level Security (RLS) ensures users can only access their own data. UUIDs are used as primary keys to prevent ID enumeration attacks.
+Every query is scoped to the authenticated user in the repository layer (the API connects with a privileged database role, so Supabase Row Level Security is not relied on). UUIDs are used as primary keys to prevent ID enumeration attacks.
 
 ---
 

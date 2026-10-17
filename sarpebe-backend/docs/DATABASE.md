@@ -6,7 +6,8 @@ This document outlines the comprehensive database schema design for the SARPEBE 
 
 ```mermaid
 erDiagram
-    auth_users ||--|| profiles : "has one (Supabase Auth)"
+    profiles ||--o{ refresh_tokens : "has sessions"
+    profiles ||--o{ auth_tokens : "has email tokens"
     profiles ||--o{ lesson_plans : "creates"
     profiles ||--o{ llm_cost_logs : "incurs"
     
@@ -15,7 +16,10 @@ erDiagram
     lesson_plans ||--o| llm_cost_logs : "generates log"
 
     profiles {
-        uuid id PK "FK to auth.users.id (CASCADE)"
+        uuid id PK
+        varchar email "unique, lower-case"
+        varchar password_hash "bcrypt"
+        timestamp email_verified_at
         varchar full_name
         varchar school_name
         varchar subscription_tier "free, premium"
@@ -40,6 +44,25 @@ erDiagram
         int page_number
         varchar grade_level "Denormalized for vector filter"
         varchar subject "Denormalized for vector filter"
+    }
+
+    refresh_tokens {
+        uuid id PK
+        uuid user_id FK "(CASCADE)"
+        uuid family_id
+        varchar token_hash "sha256, unique"
+        timestamp expires_at
+        timestamp revoked_at
+        boolean rotated
+    }
+
+    auth_tokens {
+        uuid id PK
+        uuid user_id FK "(CASCADE)"
+        varchar purpose "verify_email, reset_password"
+        varchar token_hash "sha256, unique"
+        timestamp expires_at
+        timestamp used_at
     }
 
     lesson_plans {
@@ -70,10 +93,13 @@ erDiagram
 
 ### 1. `profiles`
 **Purpose:** Stores application-specific user data.
-**Design:** Links 1:1 with Supabase's native `auth.users` table.
+**Design:** Owns the login credentials; authentication is implemented by the backend (`/api/auth/*`). Accounts that existed in Supabase Auth were imported by migration `b7e2f4a91c35` with their ids and bcrypt hashes.
 
 **Columns:**
-- `id` (UUID, PK): Maps to `auth.users.id`. `ON DELETE CASCADE`.
+- `id` (UUID, PK): User id (same as the former `auth.users.id` for imported accounts).
+- `email` (VARCHAR, unique, nullable): Lower-case login email. NULL for profiles with no login.
+- `password_hash` (VARCHAR, nullable): bcrypt hash (`$2a$`/`$2b$`). NULL means the account has no password until it uses password reset.
+- `email_verified_at` (TIMESTAMP, nullable): Set when the emailed link is opened (or a password is reset via email).
 - `full_name` (VARCHAR): User's displayed full name.
 - `school_name` (VARCHAR): The institution the user belongs to.
 - `subscription_tier` (VARCHAR): 'free' or 'premium'. Currently informational; no quota is enforced.
@@ -129,6 +155,25 @@ erDiagram
 - `total_cost` (DECIMAL): Calculated fiat cost.
 - `created_at` (TIMESTAMP): Call timestamp.
 
+### 6. `refresh_tokens`
+**Purpose:** One row per issued refresh token (a login session is a chain of rotated tokens).
+
+**Columns:**
+- `id` (UUID, PK), `user_id` (UUID, FK to `profiles.id`, `ON DELETE CASCADE`).
+- `family_id` (UUID, indexed): Shared by every token of one login. Replaying a token that was rotated long ago revokes the whole family.
+- `token_hash` (VARCHAR, unique): SHA-256 of the token. The raw token is never stored.
+- `expires_at`, `revoked_at` (TIMESTAMP): Lifetime and revocation time.
+- `rotated` (BOOLEAN): True when revoked because it was exchanged for a new token (as opposed to logout). A rotated token presented again within `REFRESH_REUSE_GRACE_SECONDS` is treated as two requests refreshing at once.
+
+### 7. `auth_tokens`
+**Purpose:** Single-use emailed tokens.
+
+**Columns:**
+- `id` (UUID, PK), `user_id` (UUID, FK to `profiles.id`, `ON DELETE CASCADE`).
+- `purpose` (VARCHAR): `verify_email` or `reset_password`.
+- `token_hash` (VARCHAR, unique): SHA-256 of the token.
+- `expires_at`, `used_at` (TIMESTAMP). Issuing a new token invalidates earlier unused ones of the same purpose.
+
 ## Advanced Database Concepts
 
 ### 1. Indexes & Performance Tuning (pgvector)
@@ -136,10 +181,11 @@ To ensure the RAG similarity search remains extremely fast as the dataset grows 
 - **HNSW Index:** We will apply an `HNSW` (Hierarchical Navigable Small World) index on the `embedding` column in `document_chunks` using the vector cosine operator (`vector_cosine_ops`).
 - **B-Tree Indexes:** Standard B-Tree indexes will be applied to Foreign Keys (`user_id`, `document_id`) and the denormalized filter columns (`grade_level`, `subject`) to speed up pre-filtering.
 
-### 2. Security (Row Level Security - RLS)
-Since the database is hosted on Supabase, we enforce security at the database layer using RLS:
-- Users can only `SELECT`, `UPDATE`, or `DELETE` rows in `profiles`, `lesson_plans`, and `llm_cost_logs` where `user_id = auth.uid()`.
-- Tables like `curriculum_documents` and `document_chunks` will have `SELECT` access for authenticated users, but `INSERT/UPDATE/DELETE` restricted to admin roles only.
+### 2. Security (access control)
+The backend connects with a privileged role and authenticates users itself, so Supabase Row Level Security (which relies on `auth.uid()`) does not apply. Ownership is enforced in the repository layer:
+- `lesson_plans` queries always filter by the authenticated `user_id` (`get_by_id_and_user`, `get_by_job_id_and_user`).
+- Curriculum documents and chunks are only written through admin-only endpoints (`require_admin`).
+- Do not expose the database to clients directly (e.g. via Supabase's public API) without re-enabling RLS policies.
 
 ## Architectural Trade-offs
 
