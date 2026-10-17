@@ -116,6 +116,8 @@ erDiagram
 - `status` (VARCHAR): 'processing', 'completed' or 'failed'.
 - `url_path` (VARCHAR): Storage path in Supabase Storage.
 - `uploaded_at` (TIMESTAMP): Ingestion timestamp.
+- `ingest_version` (INT, default 1): Version of the ingestion pipeline that produced the chunks. 2 = table-aware extraction + structure-aware chunking. `python -m scripts.reindex_documents` re-ingests older documents.
+- `ingest_warnings` (JSONB): Problems found while reading the PDF, e.g. pages without text (probably scanned).
 
 ### 3. `document_chunks` (The RAG Engine)
 **Purpose:** Stores text segments and mathematical vector representations for AI retrieval.
@@ -125,7 +127,11 @@ erDiagram
 - `document_id` (UUID, FK): Links to `curriculum_documents.id`. `ON DELETE CASCADE`.
 - `chunk_content` (TEXT): The extracted text used for LLM context.
 - `embedding` (VECTOR): 768-dimensional vector using Gemini Embeddings.
-- `page_number` (INT): Used for LLM citations.
+- `page_number` (INT): First page of the chunk, used for citations. `page_end` is set when the chunk spans pages.
+- `heading` (TEXT): Heading path the chunk sits under; also prepended to the text that is embedded.
+- `chunk_type` (VARCHAR): `text` or `table` (tables are Markdown and are their own chunks).
+- `embedding_model` (VARCHAR): Model that produced `embedding`, so vectors from different models are never mixed.
+- `search_vector` (TSVECTOR, generated, stored): `to_tsvector('indonesian', chunk_content)`, for keyword search.
 - `grade_level` (VARCHAR): Denormalized, stored in normalized form (trimmed, case-folded) for exact SQL pre-filtering.
 - `subject` (VARCHAR): Denormalized, stored in normalized form for exact SQL pre-filtering.
 
@@ -178,8 +184,9 @@ erDiagram
 
 ### 1. Indexes & Performance Tuning (pgvector)
 To ensure the RAG similarity search remains extremely fast as the dataset grows to thousands of pages:
-- **HNSW Index:** We will apply an `HNSW` (Hierarchical Navigable Small World) index on the `embedding` column in `document_chunks` using the vector cosine operator (`vector_cosine_ops`).
-- **B-Tree Indexes:** Standard B-Tree indexes will be applied to Foreign Keys (`user_id`, `document_id`) and the denormalized filter columns (`grade_level`, `subject`) to speed up pre-filtering.
+- **HNSW Index:** an `HNSW` index (`m=16`, `ef_construction=64`) on `document_chunks.embedding` using `vector_cosine_ops`. Because queries are filtered by grade and subject, vector search runs with `SET LOCAL hnsw.iterative_scan = relaxed_order` so the filter does not starve the result.
+- **GIN Index:** on `search_vector` for Indonesian full-text search, fused with vector results by reciprocal rank fusion.
+- **B-Tree Indexes:** on Foreign Keys (`user_id`, `document_id`) and a composite `(grade_level, subject)` index for the pre-filter. With only a handful of rows the planner still scans sequentially; the indexes matter as the corpus grows.
 
 ### 2. Security (access control)
 The backend connects with a privileged role and authenticates users itself, so Supabase Row Level Security (which relies on `auth.uid()`) does not apply. Ownership is enforced in the repository layer:

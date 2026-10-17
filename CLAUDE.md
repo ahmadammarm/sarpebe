@@ -69,11 +69,13 @@ Database (Supabase PostgreSQL + pgvector)
 - **Repository Layer**: Subclasses `BaseRepository` (`app/db/repositories/base_repository.py`) for generic CRUD. Custom queries (e.g., vector similarity search) live exclusively in domain-specific repositories.
 - **Authentication**: The backend owns authentication (`app/api/routers/auth.py`, `app/core/services/auth_service.py`): bcrypt passwords, short-lived HS256 access tokens, rotating single-use refresh tokens, emailed verification and reset links. Supabase is used only for Storage and the Postgres host. Auth endpoints must not reveal whether an email is registered.
 - **Async Tasks**: Long-running generation jobs (10-30 seconds) must run in Celery (`app/tasks/generation_tasks.py`). The API endpoint responds immediately with `202 Accepted` and a `job_id`, and clients poll `/api/lesson-plans/jobs/{job_id}`.
-- **RAG & Vector Search**:
-  - Embedding dimensionality is 768 (`text-embedding-004`).
-  - Pre-filtering is required: Always filter by `grade_level` and `subject` via SQL before computing vector cosine distance (`<=>`).
-  - Documents must be chunked by semantic boundaries (headings, sections), not arbitrary character windows.
-  - Prompts must mandate explicit citations (`document_name` and `page_number`).
+- **RAG & Vector Search** (details in `sarpebe-backend/docs/AI.md`):
+  - Embedding dimensionality is 768, L2-normalized after truncation; the model name is stored per chunk.
+  - Pre-filtering is required: always filter by normalized `grade_level` and `subject` via SQL before any similarity or keyword ranking.
+  - Retrieval is hybrid: vector (pgvector `<=>`) plus Indonesian full-text candidates, fused by reciprocal rank fusion, cut by `RAG_MIN_SIMILARITY`, then reranked by a small model. If nothing is relevant, stop before generation (`InsufficientContextError`).
+  - Documents are read with table-aware extraction and chunked by structure (headings, tables as their own chunks), not arbitrary character windows.
+  - Prompts: rules only in `system_instruction`; user input and passages are escaped, tagged data. Output shape comes from the Pydantic schema (`response_json_schema`), never a hand-written copy.
+  - Citations are built by the server from passage ids (`S1`...), never trusted as free text from the model. Bump `PROMPT_VERSION` when a prompt or schema changes and run `python -m evals.run ...` before and after.
 - **Database Transactions & Concurrency**:
   - Multi-write operations must use `async with session.begin():`.
   - Generation is currently unlimited (the per-tier quota was removed). If a quota is ever reintroduced, deduct it under pessimistic row locking via `.with_for_update()`.

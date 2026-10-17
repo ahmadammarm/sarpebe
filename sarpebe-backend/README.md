@@ -43,8 +43,10 @@ sarpebe-backend/
 │   │   ├── exceptions.py           # App-wide custom exception classes
 │   │   └── services/               # Business logic layer (no SQL, no HTTP here)
 │   │       ├── embedding_service.py    # Generates Gemini text embeddings
-│   │       ├── rag_service.py          # Retrieval: pre-filter + vector search
-│   │       ├── llm_service.py          # Gemini API calls, token counting, cost calculation
+│   │       ├── rag_service.py          # Retrieval: pre-filter, hybrid search, rerank (see retrieval/)
+│   │       ├── ingestion_service.py    # PDF -> chunks -> embeddings
+│   │       ├── llm_service.py          # Structured generation, one repair call, server-side checks
+│   │       ├── lesson_plan_checks.py   # Time sums, table shape, source ids, server-built references
 │   │       └── lesson_plan_service.py  # Coordinates RAG + generation flow
 │   ├── db/
 │   │   ├── session.py              # AsyncEngine + AsyncSession factory
@@ -116,8 +118,8 @@ Routers handle HTTP concerns only (validation, auth injection, response formatti
 **Async LLM Processing**
 Gemini API calls take 10–30 seconds. Routers immediately return `202 Accepted` with a `job_id`. Celery workers execute the RAG pipeline and generation in the background. Clients poll the job status endpoint until the result is ready.
 
-**RAG Pre-Filtering**
-Vector similarity search is always preceded by a SQL `WHERE` clause filtering by `grade_level` and `subject`. This avoids computing cosine distances across the entire embedding table and keeps search accurate and fast as the dataset scales.
+**RAG Pre-Filtering and Hybrid Retrieval**
+Every search is preceded by a SQL `WHERE` clause filtering by `grade_level` and `subject`. Within that set, vector and Indonesian full-text candidates are fused (reciprocal rank fusion), cut by a similarity floor, and reranked by a small model. If nothing is relevant the job stops before any generation call. See [docs/AI.md](docs/AI.md) for the whole pipeline, prompts, and how to evaluate changes.
 
 **Commit Before Dispatch**
 Celery tasks are dispatched only after the lesson plan / document row is committed, so the worker never races the request transaction. Job status is read from the database row rather than Celery's result backend.
