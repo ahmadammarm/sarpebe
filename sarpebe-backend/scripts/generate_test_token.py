@@ -1,3 +1,4 @@
+"""Dev-only: mints a Supabase-style HS256 token for a new admin profile. Run from sarpebe-backend/: python -m scripts.generate_test_token"""
 import asyncio
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -24,7 +25,7 @@ async def main():
         user = Profile(
             id=test_user_id,
             full_name="Test Educator",
-            subscription_tier="premium",
+            subscription_tier="free",
             role="admin"
         )
         db.add(user)

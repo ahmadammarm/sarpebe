@@ -48,7 +48,7 @@ Target Pemahaman (TP):
     pdf.multi_cell(0, 8, content)
     
     # Save the PDF
-    output_path = os.path.join(os.getcwd(), "sample_kurikulum_biologi.pdf")
+    output_path = os.path.join(os.getcwd(), "tests", "fixtures", "sample_kurikulum_biologi.pdf")
     pdf.output(output_path)
     print(f"Generated: {output_path}")
 
