@@ -67,6 +67,7 @@ Database (Supabase PostgreSQL + pgvector)
 - **Router Layer**: Validates requests and returns HTTP responses. Injects dependencies via `app/api/deps.py` (e.g. `get_db`, `get_current_user`). Never touches database models or executes queries directly.
 - **Service Layer**: Implements core business logic. Coordinates RAG, handles document chunking, calls Gemini API, and tracks token costs. Never accesses database without a repository.
 - **Repository Layer**: Subclasses `BaseRepository` (`app/db/repositories/base_repository.py`) for generic CRUD. Custom queries (e.g., vector similarity search) live exclusively in domain-specific repositories.
+- **Authentication**: The backend owns authentication (`app/api/routers/auth.py`, `app/core/services/auth_service.py`): bcrypt passwords, short-lived HS256 access tokens, rotating single-use refresh tokens, emailed verification and reset links. Supabase is used only for Storage and the Postgres host. Auth endpoints must not reveal whether an email is registered.
 - **Async Tasks**: Long-running generation jobs (10-30 seconds) must run in Celery (`app/tasks/generation_tasks.py`). The API endpoint responds immediately with `202 Accepted` and a `job_id`, and clients poll `/api/lesson-plans/jobs/{job_id}`.
 - **RAG & Vector Search**:
   - Embedding dimensionality is 768 (`text-embedding-004`).
@@ -75,7 +76,10 @@ Database (Supabase PostgreSQL + pgvector)
   - Prompts must mandate explicit citations (`document_name` and `page_number`).
 - **Database Transactions & Concurrency**:
   - Multi-write operations must use `async with session.begin():`.
-  - Quota deduction must use pessimistic row locking via `.with_for_update()` to prevent race conditions.
+  - Generation is currently unlimited (the per-tier quota was removed). If a quota is ever reintroduced, deduct it under pessimistic row locking via `.with_for_update()`.
+  - Commit before dispatching a Celery task so the worker is guaranteed to see the row. Job status is derived from the `lesson_plans` row, never from Celery state.
+  - Cost logs are written through `app/core/services/cost_logging.py` in their own session so they survive rollbacks.
+  - Celery tasks must create their DB engine inside `asyncio.run()` via `task_session_scope()` (`app/db/session.py`).
   - Every Gemini API call must log token counts and calculated cost to `llm_cost_logs` using `app/utils/cost_calculator.py`.
 
 ### Frontend Architecture
@@ -94,7 +98,7 @@ Backend REST API
 ```
 
 - **Page Layer**: Assembles layout and feature components. Must not make direct `fetch()` or API client calls.
-- **Hook Layer**: Encapsulates server state and side effects using TanStack Query. Provides polling logic (`useJobPolling.ts`) for async generation jobs.
+- **Hook Layer**: Encapsulates server state and side effects using TanStack Query. Provides job tracking (`useJobStatus.ts`: authenticated SSE with a polling fallback) for async generation jobs.
 - **API Client Layer**: `lib/api/client.ts` is the single entry point for backend requests, injecting authentication tokens and handling base URL configurations.
 - **State Management**:
   - Server state: TanStack Query inside `lib/hooks/`.
