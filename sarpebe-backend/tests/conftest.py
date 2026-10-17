@@ -7,10 +7,13 @@ os.environ["REQUIRE_EMAIL_VERIFICATION"] = "true"
 
 import pytest
 from unittest.mock import AsyncMock
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import StaticPool
 from httpx import AsyncClient, ASGITransport
 from app.main import app
 from app.api.deps import get_current_user, get_db
-from app.db.models.profile import Profile
+from app.db.base import Base
+from app.db.models import AuthToken, Profile, RefreshToken
 from datetime import datetime, timezone
 import uuid
 
@@ -46,3 +49,18 @@ async def async_client(mock_db):
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         yield client
     app.dependency_overrides.pop(get_db, None)
+
+@pytest.fixture
+async def db():
+    """A real SQLAlchemy session over in-memory SQLite with the authentication tables."""
+    engine = create_async_engine(
+        "sqlite+aiosqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False}
+    )
+    async with engine.begin() as conn:
+        await conn.run_sync(
+            Base.metadata.create_all,
+            tables=[Profile.__table__, RefreshToken.__table__, AuthToken.__table__],
+        )
+    async with async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)() as session:
+        yield session
+    await engine.dispose()

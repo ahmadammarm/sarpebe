@@ -181,6 +181,16 @@ cp .env.example .env
 alembic upgrade head
 ```
 
+### Seeding Users
+
+Creates one admin (`admin@example.com`) and one teacher (`guru@example.com`), both email-verified. It is safe to run repeatedly: existing accounts are left unchanged unless `--reset-passwords` is passed.
+
+```bash
+python -m scripts.seed_users
+```
+
+Set `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_USER_EMAIL` and `SEED_USER_PASSWORD` (environment or `.env`) to choose the accounts. A password you do not provide is generated and printed once for newly created accounts; there are no built-in default passwords. For a single ad-hoc account use `python -m scripts.create_user <email> <password> --role admin`.
+
 ### Running the API Server
 
 ```bash

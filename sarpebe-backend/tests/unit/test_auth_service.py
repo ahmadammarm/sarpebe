@@ -4,8 +4,6 @@ from datetime import timedelta
 import bcrypt
 import pytest
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import StaticPool
 
 from app.config import settings
 from app.core import rate_limit, security
@@ -18,7 +16,6 @@ from app.core.exceptions import (
 )
 from app.core.security import decode_access_token, hash_token
 from app.core.services.auth_service import RESET_PASSWORD, VERIFY_EMAIL, auth_service
-from app.db.base import Base
 from app.db.models import AuthToken, Profile, RefreshToken
 from app.utils.time import utc_now
 
@@ -50,22 +47,6 @@ def fake_rate_limit(monkeypatch):
     monkeypatch.setattr(rate_limit, "increment", increment)
     monkeypatch.setattr(rate_limit, "reset", reset)
     return counters
-
-
-@pytest.fixture
-async def db():
-    """A real SQLAlchemy session over in-memory SQLite with the authentication tables."""
-    engine = create_async_engine(
-        "sqlite+aiosqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False}
-    )
-    async with engine.begin() as conn:
-        await conn.run_sync(
-            Base.metadata.create_all,
-            tables=[Profile.__table__, RefreshToken.__table__, AuthToken.__table__],
-        )
-    async with async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)() as session:
-        yield session
-    await engine.dispose()
 
 
 async def make_user(db, email="guru@example.com", verified=True, password=PASSWORD, password_hash=None):
