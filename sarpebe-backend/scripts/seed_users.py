@@ -20,6 +20,7 @@ import secrets
 from dataclasses import dataclass
 
 from dotenv import load_dotenv
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import MAX_PASSWORD_BYTES, normalize_email
@@ -98,9 +99,17 @@ async def main(reset_passwords: bool) -> None:
     from app.db.session import AsyncSessionLocal
 
     users = resolve_users(dict(os.environ))
-    async with AsyncSessionLocal() as db:
-        results = await seed(db, users, reset_passwords=reset_passwords)
-        await db.commit()
+    try:
+        async with AsyncSessionLocal() as db:
+            results = await seed(db, users, reset_passwords=reset_passwords)
+            await db.commit()
+    except ProgrammingError as error:
+        if "does not exist" in str(error.orig):
+            raise SystemExit(
+                "The database schema is out of date (the credential columns are missing).\n"
+                "Run `alembic upgrade head` first, then run the seeder again."
+            )
+        raise
 
     for result in results:
         line = f"{result.action:<8} {result.role:<6} {result.email}"
