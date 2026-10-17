@@ -1,7 +1,17 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from app.api.router import api_router
+from app.config import settings
+from app.core.exceptions import (
+    AppError,
+    DocumentNotFoundError,
+    InvalidStateError,
+    InvalidUploadError,
+    LessonPlanNotFoundError,
+    NotOwnerError,
+)
 from app.db.session import engine
 
 @asynccontextmanager
@@ -21,11 +31,26 @@ app = FastAPI(
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, restrict to frontend domain
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+ERROR_STATUS_CODES: dict[type[AppError], int] = {
+    DocumentNotFoundError: 404,
+    LessonPlanNotFoundError: 404,
+    NotOwnerError: 403,
+    InvalidStateError: 409,
+    InvalidUploadError: 400,
+}
+
+
+@app.exception_handler(AppError)
+async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
+    status_code = ERROR_STATUS_CODES.get(type(exc), 400)
+    return JSONResponse(status_code=status_code, content={"detail": exc.message})
+
 
 # Register all API routes
 app.include_router(api_router)

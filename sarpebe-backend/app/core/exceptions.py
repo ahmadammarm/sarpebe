@@ -4,10 +4,6 @@ class AppError(Exception):
         self.message = message
         super().__init__(self.message)
 
-class QuotaExceededError(AppError):
-    """Raised when a user has exceeded their lesson plan generation quota."""
-    pass
-
 class DocumentNotFoundError(AppError):
     """Raised when a requested curriculum document cannot be found."""
     pass
@@ -18,4 +14,12 @@ class LessonPlanNotFoundError(AppError):
 
 class NotOwnerError(AppError):
     """Raised when a user attempts to access a resource they do not own."""
+    pass
+
+class InvalidStateError(AppError):
+    """Raised when an operation is not allowed in the resource's current state."""
+    pass
+
+class InvalidUploadError(AppError):
+    """Raised when an uploaded file fails validation."""
     pass

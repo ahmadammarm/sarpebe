@@ -9,7 +9,8 @@ class Settings(BaseSettings):
     gemini_embedding_model: str = "gemini-embedding-2"
     gemini_generation_model: str = "gemini-2.5-flash-lite"
     redis_url: str
-    free_tier_quota: int = 3
+    cors_origins: list[str] = ["http://localhost:3000"]
+    max_upload_mb: int = 20
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
