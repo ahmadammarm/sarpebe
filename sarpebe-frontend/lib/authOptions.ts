@@ -17,6 +17,8 @@ function loginErrorCode(error: unknown): string {
       return AUTH_ERRORS.emailNotVerified;
     case "too_many_attempts":
       return AUTH_ERRORS.tooManyAttempts;
+    case "account_disabled":
+      return AUTH_ERRORS.accountDisabled;
     default:
       return AUTH_ERRORS.serverError;
   }
@@ -82,7 +84,7 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       // Initial sign-in: copy what the backend returned into the session token.
       if (user) {
         token.id = user.id;
@@ -92,6 +94,11 @@ export const authOptions: NextAuthOptions = {
         token.accessTokenExpires = user.accessTokenExpires;
         token.error = undefined;
         return token;
+      }
+
+      // `useSession().update({ name })` after the profile was saved: show the new name without waiting for a refresh.
+      if (trigger === "update" && typeof session?.name === "string" && session.name.trim()) {
+        token.name = session.name.trim();
       }
 
       // A dead session stays dead until the user signs in again.

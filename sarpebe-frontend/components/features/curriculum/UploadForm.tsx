@@ -11,17 +11,12 @@ import { Notice } from "@/components/ui/notice";
 import { Select } from "@/components/ui/select";
 import { useUploadCurriculumDocument } from "@/lib/hooks/useCurriculum";
 import { getErrorMessage } from "@/lib/utils/errors";
+import { DOCUMENT_TYPE_OPTIONS } from "@/lib/utils/curriculum";
 import { faseForGrade } from "@/lib/utils/fase";
 import { curriculumUploadSchema, MAX_UPLOAD_MB, zodFieldErrors } from "@/lib/utils/validators";
 import type { DocumentType } from "@/types/curriculum";
 
 type FieldName = "grade_level" | "subject" | "document_type" | "file";
-
-const DOCUMENT_TYPE_OPTIONS: { value: DocumentType; label: string }[] = [
-  { value: "CP", label: "Capaian Pembelajaran (CP)" },
-  { value: "ATP", label: "Alur Tujuan Pembelajaran (ATP)" },
-  { value: "BUKU_GURU", label: "Buku Guru" },
-];
 
 function formatSize(bytes: number): string {
   return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;

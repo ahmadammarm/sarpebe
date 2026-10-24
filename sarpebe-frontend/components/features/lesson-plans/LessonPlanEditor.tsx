@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Notice } from "@/components/ui/notice";
 import { Textarea } from "@/components/ui/textarea";
-import { useDownloadLessonPlanPdf, useUpdateLessonPlan } from "@/lib/hooks/useLessonPlans";
+import { useDownloadLessonPlan, useUpdateLessonPlan } from "@/lib/hooks/useLessonPlans";
 import { getErrorMessage } from "@/lib/utils/errors";
 import type { LessonActivity, LessonPlanContent, LessonPlanV1 } from "@/types/lesson-plan";
 
@@ -60,7 +60,7 @@ export function LessonPlanEditor({ plan }: LessonPlanEditorProps) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const updatePlan = useUpdateLessonPlan(plan.id);
-  const downloadPdf = useDownloadLessonPlanPdf();
+  const download = useDownloadLessonPlan();
 
   const dirty = JSON.stringify(content) !== JSON.stringify(saved);
 
@@ -100,7 +100,7 @@ export function LessonPlanEditor({ plan }: LessonPlanEditorProps) {
   const handleDownload = async () => {
     try {
       setErrorMsg(null);
-      await downloadPdf.mutateAsync({ id: plan.id, topic: content.title || plan.topic });
+      await download.mutateAsync({ id: plan.id, topic: content.title || plan.topic, format: "pdf" });
     } catch (err) {
       setErrorMsg(getErrorMessage(err, "PDF belum bisa diunduh. Coba lagi."));
     }
@@ -130,9 +130,9 @@ export function LessonPlanEditor({ plan }: LessonPlanEditorProps) {
         </div>
 
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center">
-          <Button variant="outline" onClick={handleDownload} disabled={downloadPdf.isPending}>
+          <Button variant="outline" onClick={handleDownload} disabled={download.isPending}>
             <Download aria-hidden />
-            {downloadPdf.isPending ? "Menyiapkan..." : "Unduh PDF"}
+            {download.isPending ? "Menyiapkan..." : "Unduh PDF"}
           </Button>
           <Button onClick={handleSave} disabled={!dirty || updatePlan.isPending}>
             <Save aria-hidden />

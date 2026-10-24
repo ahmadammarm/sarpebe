@@ -7,8 +7,8 @@ export default withAuth(
     const token = req.nextauth.token;
     const pathname = req.nextUrl.pathname;
 
-    // Rute /curriculum hanya boleh diakses oleh pengguna dengan role 'admin'
-    if (pathname.startsWith("/curriculum")) {
+    // Rute /curriculum dan /admin hanya boleh diakses oleh pengguna dengan role 'admin'
+    if (pathname.startsWith("/curriculum") || pathname.startsWith("/admin")) {
       const role = token?.role;
       if (role !== "admin") {
         const redirectUrl = new URL("/lesson-plans", req.url);
@@ -33,6 +33,8 @@ export default withAuth(
 export const config = {
   matcher: [
     "/lesson-plans/:path*",
-    "/curriculum/:path*"
+    "/curriculum/:path*",
+    "/profile/:path*",
+    "/admin/:path*"
   ],
 };

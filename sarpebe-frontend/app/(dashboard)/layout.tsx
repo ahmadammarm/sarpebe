@@ -17,6 +17,8 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: "/lesson-plans", label: "Modul ajar" },
   { href: "/curriculum", label: "Dokumen kurikulum", adminOnly: true },
+  { href: "/admin/users", label: "Pengguna", adminOnly: true },
+  { href: "/profile", label: "Profil" },
 ];
 
 export default function DashboardLayout({
@@ -64,10 +66,14 @@ export default function DashboardLayout({
         })}
         actions={
           <>
-            <div className="hidden text-right text-sm leading-tight lg:block">
+            <Link
+              href="/profile"
+              aria-label={`Profil ${displayName}`}
+              className="hidden rounded-sm text-right text-sm leading-tight outline-none hover:text-ballpoint focus-visible:ring-3 focus-visible:ring-ring/40 lg:block"
+            >
               <div className="max-w-48 truncate font-semibold">{displayName}</div>
               <div className="text-xs text-ink-soft">{roleLabel}</div>
-            </div>
+            </Link>
             <Button variant="ghost" size="sm" onClick={() => signOut({ callbackUrl: "/login" })}>
               <LogOut aria-hidden />
               Keluar

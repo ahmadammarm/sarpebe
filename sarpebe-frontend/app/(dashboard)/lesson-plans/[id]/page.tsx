@@ -65,7 +65,7 @@ export default function LessonPlanDetailPage() {
     );
   }
 
-  const failure = describeFailure(plan.generated_content?.error);
+  const failure = describeFailure(plan.generated_content?.error, plan.generated_content?.code);
 
   return (
     <div className="mx-auto max-w-2xl">

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Atkinson_Hyperlegible_Next, Bricolage_Grotesque, Caveat } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
 import { themeInitScript } from "@/lib/theme-script";
 
 // Display: sturdy, slightly quirky grotesque for headings.
@@ -26,12 +27,26 @@ const hand = Caveat({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: {
-    default: "SARPEBE",
-    template: "%s | SARPEBE",
+    default: SITE_NAME,
+    template: `%s | ${SITE_NAME}`,
   },
-  description:
-    "Susun modul ajar dari Capaian Pembelajaran resmi, lengkap dengan halaman rujukannya.",
+  description: SITE_DESCRIPTION,
+  // No `url` or `alternates.canonical` here: they would be inherited by every page. The image comes
+  // from app/opengraph-image.tsx.
+  openGraph: {
+    type: "website",
+    locale: "id_ID",
+    siteName: SITE_NAME,
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+  },
 };
 
 export const viewport: Viewport = {

@@ -4,7 +4,7 @@ const MAX_PASSWORD_BYTES = 72; // bcrypt's limit, enforced by the backend as wel
 
 // Strength rules for choosing a password. Login deliberately does not apply them:
 // accounts imported from the old auth provider may have shorter passwords.
-const newPasswordSchema = z
+export const newPasswordSchema = z
   .string()
   .min(8, "Password minimal 8 karakter.")
   .refine((value) => new TextEncoder().encode(value).length <= MAX_PASSWORD_BYTES, "Password terlalu panjang.");
@@ -33,6 +33,26 @@ export const resetPasswordSchema = z
     path: ["confirmPassword"],
     message: "Password tidak sama.",
   });
+
+export const profileSchema = z.object({
+  full_name: z.string().trim().min(2, "Nama lengkap minimal 2 karakter.").max(100, "Nama lengkap maksimal 100 karakter."),
+  school_name: z.string().trim().max(150, "Nama sekolah maksimal 150 karakter."),
+});
+
+export const changePasswordSchema = z
+  .object({
+    current_password: z.string().min(1, "Password saat ini wajib diisi."),
+    new_password: newPasswordSchema,
+    confirm_password: z.string(),
+  })
+  .refine((value) => value.new_password === value.confirm_password, {
+    path: ["confirm_password"],
+    message: "Password tidak sama.",
+  });
+
+export const deleteAccountSchema = z.object({
+  password: z.string().min(1, "Masukkan password Anda untuk melanjutkan."),
+});
 
 export const MAX_CLASS_NOTES = 500;
 
@@ -91,6 +111,13 @@ export const curriculumUploadSchema = z.object({
     .refine((file) => file.size <= MAX_UPLOAD_MB * 1024 * 1024, `Ukuran file maksimal ${MAX_UPLOAD_MB} MB.`),
 });
 
+export const curriculumEditSchema = z.object({
+  title: z.string().trim().min(1, "Judul wajib diisi.").max(255, "Judul maksimal 255 karakter."),
+  document_type: z.enum(["CP", "ATP", "BUKU_GURU"]),
+  grade_level: lessonPlanCreateSchema.shape.grade_level,
+  subject: lessonPlanCreateSchema.shape.subject,
+});
+
 export type LoginFormData = z.infer<typeof loginSchema>;
 export type RegisterFormData = z.infer<typeof registerSchema>;
 export type RegisterInput = RegisterFormData;
@@ -98,6 +125,10 @@ export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type LessonPlanCreateInput = z.infer<typeof lessonPlanCreateSchema>;
 export type CurriculumUploadInput = z.infer<typeof curriculumUploadSchema>;
+export type CurriculumEditInput = z.infer<typeof curriculumEditSchema>;
+export type ProfileInput = z.infer<typeof profileSchema>;
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+export type DeleteAccountInput = z.infer<typeof deleteAccountSchema>;
 
 /** Maps a ZodError to `{ field: firstMessage }` for inline form errors. */
 export function zodFieldErrors<T extends string>(error: z.ZodError): Partial<Record<T, string>> {

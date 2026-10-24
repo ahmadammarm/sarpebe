@@ -3,12 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Sheet } from "@/components/brand/Sheet";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
+import { Pagination } from "@/components/ui/pagination";
 import { LessonPlanList } from "@/components/features/lesson-plans/LessonPlanList";
-import { useDeleteLessonPlan, useDownloadLessonPlanPdf, useLessonPlans, isUnfinished } from "@/lib/hooks/useLessonPlans";
+import { useDeleteLessonPlan, useDownloadLessonPlan, useLessonPlans, isUnfinished } from "@/lib/hooks/useLessonPlans";
 import { getErrorMessage } from "@/lib/utils/errors";
 import type { LessonPlan } from "@/types/lesson-plan";
 
@@ -21,7 +22,7 @@ export function LessonPlanDashboard() {
 
   const { data, isLoading, isError } = useLessonPlans(page * PAGE_SIZE, PAGE_SIZE, status === "authenticated");
   const deletePlan = useDeleteLessonPlan();
-  const downloadPdf = useDownloadLessonPlanPdf();
+  const download = useDownloadLessonPlan();
 
   const plans = data?.items ?? [];
   const total = data?.total ?? 0;
@@ -43,7 +44,7 @@ export function LessonPlanDashboard() {
   const handleDownload = async (plan: LessonPlan) => {
     try {
       setActionError(null);
-      await downloadPdf.mutateAsync({ id: plan.id, topic: plan.topic });
+      await download.mutateAsync({ id: plan.id, topic: plan.topic, format: "pdf" });
     } catch (err) {
       setActionError(getErrorMessage(err, "PDF belum bisa diunduh. Coba lagi."));
     }
@@ -109,23 +110,7 @@ export function LessonPlanDashboard() {
             <LessonPlanList plans={plans} onDelete={handleDelete} onDownload={handleDownload} />
           )}
 
-          {pageCount > 1 && (
-            <nav aria-label="Halaman daftar" className="flex flex-wrap items-center justify-between gap-3 border-t border-rule py-4 text-sm text-ink-soft">
-              <span>
-                Halaman {page + 1} dari {pageCount}
-              </span>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(page - 1)}>
-                  <ChevronLeft aria-hidden />
-                  Sebelumnya
-                </Button>
-                <Button variant="outline" size="sm" disabled={page + 1 >= pageCount} onClick={() => setPage(page + 1)}>
-                  Berikutnya
-                  <ChevronRight aria-hidden />
-                </Button>
-              </div>
-            </nav>
-          )}
+          <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
         </Sheet>
       )}
     </div>

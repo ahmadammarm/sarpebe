@@ -1,6 +1,6 @@
 # SARPEBE Backend
 
-FastAPI REST API, Celery worker, migrations and evaluation harness for SARPEBE. It handles authentication, curriculum ingestion, retrieval-augmented generation of lesson plans with Google Gemini, PDF export, and cost logging.
+FastAPI REST API, Celery worker, migrations and evaluation harness for SARPEBE. It handles authentication, curriculum ingestion, retrieval-augmented generation of lesson plans with Google Gemini, PDF and Word export, and cost logging.
 
 This file is a short orientation. The full documentation is in the repository's [docs](../docs/README.md) folder.
 
@@ -18,7 +18,7 @@ sarpebe-backend/
     db/             session, models, repositories
     schemas/        Pydantic request, response and content models
     tasks/          Celery app, generation and ingestion tasks
-    utils/          PDF reading, chunking, labels, fase, cost math, PDF export
+    utils/          PDF reading, chunking, labels, fase, cost math, PDF and Word export
     assets/fonts/   bundled DejaVu fonts for PDF export
   alembic/          migrations
   evals/            offline evaluation harness

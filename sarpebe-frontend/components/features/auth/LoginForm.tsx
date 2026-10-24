@@ -15,11 +15,17 @@ import { useResendVerification } from "@/lib/hooks/useAuth";
 const LOGIN_ERROR_MESSAGES: Record<string, string> = {
   [AUTH_ERRORS.invalidCredentials]: "Email atau password salah. Periksa lagi, atau atur ulang password Anda.",
   [AUTH_ERRORS.emailNotVerified]: "Email Anda belum diverifikasi. Buka tautan di email pendaftaran.",
+  [AUTH_ERRORS.accountDisabled]: "Akun ini dinonaktifkan. Hubungi administrator.",
   [AUTH_ERRORS.tooManyAttempts]: "Terlalu banyak percobaan gagal. Tunggu beberapa menit, lalu coba lagi.",
   [AUTH_ERRORS.serverError]: "Server tidak dapat dihubungi. Coba lagi sebentar lagi.",
 };
 
-export function LoginForm() {
+interface LoginFormProps {
+  /** Shown above the form, e.g. after the password was changed. */
+  notice?: string;
+}
+
+export function LoginForm({ notice }: LoginFormProps) {
   const router = useRouter();
   const resendVerification = useResendVerification();
   const [formData, setFormData] = useState<LoginFormData>({ email: "", password: "" });
@@ -69,6 +75,11 @@ export function LoginForm() {
       note="Belum punya akun? Daftar dulu, hanya butuh email."
     >
       <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+        {notice && (
+          <Notice tone="success">
+            <p>{notice}</p>
+          </Notice>
+        )}
         <Field
           id="email"
           label="Email"

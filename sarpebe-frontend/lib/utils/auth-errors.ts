@@ -3,5 +3,6 @@ export const AUTH_ERRORS = {
   invalidCredentials: "INVALID_CREDENTIALS",
   emailNotVerified: "EMAIL_NOT_VERIFIED",
   tooManyAttempts: "TOO_MANY_ATTEMPTS",
+  accountDisabled: "ACCOUNT_DISABLED",
   serverError: "SERVER_ERROR",
 } as const;

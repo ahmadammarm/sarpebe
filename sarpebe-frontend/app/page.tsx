@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { FaseTag } from "@/components/brand/FaseTag";
 import { Mark } from "@/components/brand/Mark";
@@ -10,6 +11,9 @@ import { FaseFinder } from "@/components/landing/FaseFinder";
 import { LandingHeader } from "@/components/landing/LandingHeader";
 import { LANDING_MENU } from "@/components/landing/menu";
 import { SampleModule } from "@/components/landing/SampleModule";
+
+// The canonical address lives here, not in the root layout, which every page would inherit it from.
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 const STEPS = [
   {

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useCurriculumDocuments } from "@/lib/hooks/useCurriculum";
@@ -8,13 +9,21 @@ import { CurriculumList } from "@/components/features/curriculum/CurriculumList"
 import { Sheet } from "@/components/brand/Sheet";
 import { buttonVariants } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
+import { Pagination } from "@/components/ui/pagination";
+
+const PAGE_SIZE = 10;
 
 export default function CurriculumPage() {
   const { data: session, status } = useSession();
   const role = session?.user.role;
   const isAdmin = status === "authenticated" && role === "admin";
+  const [page, setPage] = useState(0);
 
-  const { data: documents = [], isLoading, isError } = useCurriculumDocuments(isAdmin);
+  const { data, isLoading, isError } = useCurriculumDocuments(page * PAGE_SIZE, PAGE_SIZE, isAdmin);
+  const documents = data?.items ?? [];
+  const pageCount = Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE));
+  // Deleting the only document on the last page leaves an empty page; step back to the previous one.
+  const pastTheEnd = !isLoading && !isError && documents.length === 0 && page > 0;
 
   if (status === "loading") {
     return <p className="py-16 text-center text-ink-soft" role="status">Memeriksa hak akses...</p>;
@@ -59,8 +68,22 @@ export default function CurriculumPage() {
           <Notice tone="error">
             <p>Daftar dokumen belum bisa dimuat. Muat ulang halaman, atau coba lagi nanti.</p>
           </Notice>
+        ) : pastTheEnd ? (
+          <Notice tone="info">
+            <p>Halaman ini sudah kosong.</p>
+            <button
+              type="button"
+              onClick={() => setPage(pageCount - 1)}
+              className="font-semibold underline underline-offset-4 hover:no-underline"
+            >
+              Kembali ke halaman terakhir
+            </button>
+          </Notice>
         ) : (
-          <CurriculumList documents={documents} />
+          <>
+            <CurriculumList documents={documents} />
+            <Pagination page={page} pageCount={pageCount} onPageChange={setPage} label="Halaman daftar dokumen" />
+          </>
         )}
       </section>
     </div>

@@ -41,6 +41,8 @@ export interface LessonPlanContent {
   citations?: string[];
   /** Present when generation failed. */
   error?: string;
+  /** Stable failure identifier stored next to `error`. */
+  code?: string;
   raw?: string;
 }
 
@@ -153,6 +155,8 @@ export interface LessonPlanContentV2 {
   warnings: string[];
   /** Present only on failed plans, where the stored content is an error record. */
   error?: string;
+  /** Stable failure identifier stored next to `error`. */
+  code?: string;
 }
 
 interface LessonPlanBase {
@@ -198,4 +202,5 @@ export interface JobStatus {
   stage: GenerationStage | null;
   lesson_plan_id: string | null;
   error: string | null;
+  error_code: string | null;
 }

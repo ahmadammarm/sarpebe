@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Download, Plus, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, FileText, Plus, Save, Trash2 } from "lucide-react";
 import { FaseTag } from "@/components/brand/FaseTag";
 import { Mark } from "@/components/brand/Mark";
 import { Sheet } from "@/components/brand/Sheet";
@@ -12,7 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Notice } from "@/components/ui/notice";
 import { Textarea } from "@/components/ui/textarea";
-import { useDownloadLessonPlanPdf, useUpdateLessonPlan } from "@/lib/hooks/useLessonPlans";
+import { useDownloadLessonPlan, useUpdateLessonPlan } from "@/lib/hooks/useLessonPlans";
+import type { ExportFormat } from "@/lib/api/lesson-plans";
 import { getErrorMessage } from "@/lib/utils/errors";
 import { cn } from "@/lib/utils";
 import type {
@@ -183,7 +184,7 @@ export function LessonPlanEditorV2({ plan }: { plan: LessonPlanV2 }) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const updatePlan = useUpdateLessonPlan(plan.id);
-  const downloadPdf = useDownloadLessonPlanPdf();
+  const download = useDownloadLessonPlan();
 
   const dirty = JSON.stringify(content) !== JSON.stringify(saved);
 
@@ -217,12 +218,12 @@ export function LessonPlanEditorV2({ plan }: { plan: LessonPlanV2 }) {
     }
   };
 
-  const handleDownload = async () => {
+  const handleDownload = async (format: ExportFormat) => {
     try {
       setErrorMsg(null);
-      await downloadPdf.mutateAsync({ id: plan.id, topic: content.title || plan.topic });
+      await download.mutateAsync({ id: plan.id, topic: content.title || plan.topic, format });
     } catch (err) {
-      setErrorMsg(getErrorMessage(err, "PDF belum bisa diunduh. Coba lagi."));
+      setErrorMsg(getErrorMessage(err, `${format === "pdf" ? "PDF" : "Dokumen Word"} belum bisa diunduh. Coba lagi.`));
     }
   };
 
@@ -261,11 +262,15 @@ export function LessonPlanEditorV2({ plan }: { plan: LessonPlanV2 }) {
         </div>
 
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center">
-          <Button variant="outline" onClick={handleDownload} disabled={downloadPdf.isPending}>
+          <Button variant="outline" onClick={() => handleDownload("pdf")} disabled={download.isPending}>
             <Download aria-hidden />
-            {downloadPdf.isPending ? "Menyiapkan..." : "Unduh PDF"}
+            {download.isPending && download.variables?.format === "pdf" ? "Menyiapkan..." : "Unduh PDF"}
           </Button>
-          <Button onClick={handleSave} disabled={!dirty || updatePlan.isPending}>
+          <Button variant="outline" onClick={() => handleDownload("docx")} disabled={download.isPending}>
+            <FileText aria-hidden />
+            {download.isPending && download.variables?.format === "docx" ? "Menyiapkan..." : "Unduh Word"}
+          </Button>
+          <Button onClick={handleSave} disabled={!dirty || updatePlan.isPending} className="col-span-2 sm:col-auto">
             <Save aria-hidden />
             {updatePlan.isPending ? "Menyimpan..." : "Simpan perubahan"}
           </Button>

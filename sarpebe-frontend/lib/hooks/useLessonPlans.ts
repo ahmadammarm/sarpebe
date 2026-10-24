@@ -4,11 +4,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createLessonPlan,
   deleteLessonPlan,
-  downloadLessonPlanPdf,
+  downloadLessonPlanFile,
+  type ExportFormat,
   getLessonPlan,
   getLessonPlans,
   updateLessonPlan,
 } from "@/lib/api/lesson-plans";
+import { userKeys } from "@/lib/hooks/useUsers";
 import type { AnyLessonPlanContent, LessonPlan, LessonPlanStatus } from "@/types/lesson-plan";
 
 const POLL_INTERVAL_MS = 3000;
@@ -52,7 +54,10 @@ export function useCreateLessonPlan() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: createLessonPlan,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: lessonPlanKeys.all }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: userKeys.quota });
+      return queryClient.invalidateQueries({ queryKey: lessonPlanKeys.all });
+    },
   });
 }
 
@@ -75,8 +80,9 @@ export function useDeleteLessonPlan() {
   });
 }
 
-export function useDownloadLessonPlanPdf() {
+export function useDownloadLessonPlan() {
   return useMutation({
-    mutationFn: ({ id, topic }: { id: string; topic: string }) => downloadLessonPlanPdf(id, topic),
+    mutationFn: ({ id, topic, format }: { id: string; topic: string; format: ExportFormat }) =>
+      downloadLessonPlanFile(id, topic, format),
   });
 }

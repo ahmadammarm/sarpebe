@@ -73,7 +73,14 @@ export function useJobStatus(jobId: string | null) {
           update({ connectionError: null });
         } catch (err) {
           if (isNotFoundError(err)) {
-            apply({ job_id: id, status: "failed", stage: null, lesson_plan_id: null, error: "Pekerjaan tidak ditemukan." });
+            apply({
+              job_id: id,
+              status: "failed",
+              stage: null,
+              lesson_plan_id: null,
+              error: "Pekerjaan tidak ditemukan.",
+              error_code: "job_not_found",
+            });
             return;
           }
           update({ connectionError: "Gagal memperbarui status pekerjaan. Mencoba lagi..." });
@@ -96,6 +103,9 @@ export function useJobStatus(jobId: string | null) {
     isDone: isTerminal(status),
     stage: job?.stage ?? null,
     lessonPlanId: job?.lesson_plan_id ?? null,
-    error: job?.error ?? current?.connectionError ?? null,
+    error: job?.error ?? null,
+    errorCode: job?.error_code ?? null,
+    /** Set while status updates cannot be fetched; the job itself may still be running. */
+    connectionError: current?.connectionError ?? null,
   };
 }

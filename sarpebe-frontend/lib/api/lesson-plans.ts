@@ -1,4 +1,5 @@
 import { API_BASE_URL, apiClient, getAuthToken } from "./client";
+import { safeFilename } from "@/lib/utils/formatters";
 import type { LessonPlanCreateInput } from "@/lib/utils/validators";
 import type {
   CreateLessonPlanResponse,
@@ -88,17 +89,27 @@ export async function streamJobStatus(
   }
 }
 
-export async function downloadLessonPlanPdf(id: string, topicName = "Modul_Ajar"): Promise<void> {
-  const response = await apiClient.get<Blob>(`/api/lesson-plans/${id}/export/pdf`, {
+export type ExportFormat = "pdf" | "docx";
+
+const EXPORT_MEDIA_TYPES: Record<ExportFormat, string> = {
+  pdf: "application/pdf",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+};
+
+export async function downloadLessonPlanFile(
+  id: string,
+  topicName = "Modul_Ajar",
+  format: ExportFormat = "pdf"
+): Promise<void> {
+  const response = await apiClient.get<Blob>(`/api/lesson-plans/${id}/export/${format}`, {
     responseType: "blob",
   });
 
-  const blob = new Blob([response.data], { type: "application/pdf" });
+  const blob = new Blob([response.data], { type: EXPORT_MEDIA_TYPES[format] });
   const downloadUrl = window.URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = downloadUrl;
-  const safeFilename = `${topicName.replace(/\s+/g, "_")}.pdf`;
-  link.setAttribute("download", safeFilename);
+  link.setAttribute("download", safeFilename(topicName, format));
   document.body.appendChild(link);
   link.click();
   link.remove();

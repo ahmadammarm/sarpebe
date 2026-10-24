@@ -15,7 +15,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { GenerationProgress } from "@/components/features/lesson-plans/GenerationProgress";
 import { useCreateLessonPlan } from "@/lib/hooks/useLessonPlans";
 import { useJobStatus } from "@/lib/hooks/useJobStatus";
+import { useQuota } from "@/lib/hooks/useUsers";
 import { getErrorMessage } from "@/lib/utils/errors";
+import { formatDateTime } from "@/lib/utils/formatters";
 import { describeFailure } from "@/lib/utils/lesson-plan";
 import { faseForGrade } from "@/lib/utils/fase";
 import { MAX_CLASS_NOTES, lessonPlanCreateSchema, zodFieldErrors } from "@/lib/utils/validators";
@@ -33,6 +35,8 @@ type FieldName =
 export default function NewLessonPlanPage() {
   const router = useRouter();
   const createPlan = useCreateLessonPlan();
+  const { data: quota } = useQuota();
+  const quotaReached = quota?.remaining === 0;
 
   const [gradeLevel, setGradeLevel] = useState("");
   const [subject, setSubject] = useState("");
@@ -47,7 +51,14 @@ export default function NewLessonPlanPage() {
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldName, string>>>({});
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const { status: jobStatus, stage, isDone, error: jobError } = useJobStatus(activeJobId);
+  const {
+    status: jobStatus,
+    stage,
+    isDone,
+    error: jobError,
+    errorCode: jobErrorCode,
+    connectionError,
+  } = useJobStatus(activeJobId);
   const fase = faseForGrade(gradeLevel);
 
   const handleGenerate = async (e: React.FormEvent) => {
@@ -86,7 +97,7 @@ export default function NewLessonPlanPage() {
   }, [isDone, jobStatus, createdPlanId, router]);
 
   const failed = jobStatus === "failed";
-  const failure = describeFailure(jobError);
+  const failure = describeFailure(jobError, jobErrorCode);
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -221,7 +232,22 @@ export default function NewLessonPlanPage() {
                 </Notice>
               )}
 
-              <Button type="submit" size="lg" className="w-full sm:w-auto" disabled={createPlan.isPending}>
+              {quota && !quota.unlimited && (
+                quotaReached ? (
+                  <Notice tone="info">
+                    <p>
+                      Batas {quota.limit} modul dalam 24 jam terakhir sudah tercapai.
+                      {quota.resets_at && ` Anda bisa menyusun lagi mulai ${formatDateTime(quota.resets_at)}.`}
+                    </p>
+                  </Notice>
+                ) : (
+                  <p className="text-sm text-ink-soft" aria-live="polite">
+                    Sisa {quota.remaining} dari {quota.limit} modul dalam 24 jam terakhir.
+                  </p>
+                )
+              )}
+
+              <Button type="submit" size="lg" className="w-full sm:w-auto" disabled={createPlan.isPending || quotaReached}>
                 {createPlan.isPending ? "Mengirim..." : "Susun modul ajar"}
               </Button>
             </form>
@@ -256,8 +282,8 @@ export default function NewLessonPlanPage() {
             <div className="mt-7">
               <GenerationProgress status={jobStatus} stage={stage} />
             </div>
-            {jobError && jobStatus !== "completed" && (
-              <p className="mt-5 text-sm text-ink-soft">{jobError}</p>
+            {connectionError && jobStatus !== "completed" && (
+              <p className="mt-5 text-sm text-ink-soft">{connectionError}</p>
             )}
             {jobStatus === "completed" ? (
               <p className="mt-6 text-ink-soft">Membuka modul...</p>
