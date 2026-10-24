@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:3000"]
     max_upload_mb: int = 20
 
+    # OCR for scanned pages (ingestion only). Each page is one vision call, so the page cap bounds the cost.
+    ocr_enabled: bool = True
+    gemini_ocr_model: str = "gemini-3.5-flash-lite"
+    ocr_max_pages: int = Field(default=60, ge=1)
+    ocr_render_dpi: int = Field(default=150, ge=72, le=300)
+    ocr_concurrency: int = Field(default=4, ge=1, le=16)
+
     # Retrieval (RAG). The similarity floor is calibrated with `python -m evals.run retrieval`.
     rag_candidate_k: int = 20
     rag_top_k: int = 6
@@ -37,6 +44,9 @@ class Settings(BaseSettings):
     prompt_version: str = "lesson_plan.v2"
     # Attempts per model call for transient errors (429, 5xx, timeouts) only.
     llm_max_attempts: int = 3
+    # Modules a free-tier teacher may start within any 24 hours (failed plans do not count).
+    # 0 = no limit. Admins and other subscription tiers are never limited.
+    generation_daily_limit_free: int = Field(default=10, ge=0)
 
     # Authentication
     auth_jwt_secret: str = Field(min_length=32)

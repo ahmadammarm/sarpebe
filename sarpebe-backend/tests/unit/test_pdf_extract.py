@@ -30,9 +30,10 @@ def build_pdf() -> bytes:
     return bytes(pdf.output())
 
 
-def blank_pdf() -> bytes:
+def blank_pdf(pages: int = 1) -> bytes:
     pdf = FPDF()
-    pdf.add_page()
+    for _ in range(pages):
+        pdf.add_page()
     return bytes(pdf.output())
 
 
@@ -105,6 +106,11 @@ def test_a_page_without_text_is_reported():
     result = extract_pdf(blank_pdf())
     assert not result.has_text
     assert any("Halaman 1" in warning for warning in result.warnings)
+
+
+def test_pages_without_text_lists_only_the_empty_pages():
+    assert extract_pdf(blank_pdf(3)).pages_without_text == [1, 2, 3]
+    assert extract_pdf(build_pdf()).pages_without_text == []
 
 
 def test_unreadable_input_raises():

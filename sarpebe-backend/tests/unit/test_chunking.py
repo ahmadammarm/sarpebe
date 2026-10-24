@@ -1,4 +1,4 @@
-from app.utils.chunking import chunk_document, semantic_chunk_text, split_oversize
+from app.utils.chunking import blocks_from_plain_text, chunk_document, semantic_chunk_text, split_oversize
 from app.utils.pdf_extract import Block, ExtractedPage, ExtractionResult
 
 
@@ -148,3 +148,36 @@ def test_intro_line_stays_with_the_list_it_introduces():
     result = chunk_document(document([text_block(intro), text_block(items, top=20)]), max_chars=500)
     assert intro in result[0].text
     assert "kegiatan nomor 0" in result[0].text
+
+
+# --- blocks_from_plain_text -------------------------------------------------------------------
+
+def test_plain_text_paragraphs_become_text_blocks_in_order():
+    blocks = blocks_from_plain_text("Satu.\n\nDua baris\nlanjutan.\n\n\n\nTiga.", page=4)
+
+    assert [(b.kind, b.text, b.page) for b in blocks] == [
+        ("text", "Satu.", 4),
+        ("text", "Dua baris\nlanjutan.", 4),
+        ("text", "Tiga.", 4),
+    ]
+    assert [b.top for b in blocks] == sorted(b.top for b in blocks)
+
+
+def test_plain_text_table_lines_become_a_table_block():
+    text = "Pengantar.\n\n| A | B |\n| --- | --- |\n| 1 | 2 |\n\nPenutup."
+
+    blocks = blocks_from_plain_text(text, page=1)
+
+    assert [b.kind for b in blocks] == ["text", "table", "text"]
+    assert blocks[1].text == "| A | B |\n| --- | --- |\n| 1 | 2 |"
+
+
+def test_a_table_directly_after_text_without_a_blank_line_is_still_separate():
+    blocks = blocks_from_plain_text("Tabel berikut:\n| A | B |\n| --- | --- |\n| 1 | 2 |", page=1)
+
+    assert [b.kind for b in blocks] == ["text", "table"]
+    assert blocks[0].text == "Tabel berikut:"
+
+
+def test_blank_plain_text_has_no_blocks():
+    assert blocks_from_plain_text("  \n\n \n", page=1) == []

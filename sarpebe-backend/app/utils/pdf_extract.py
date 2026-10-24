@@ -47,6 +47,15 @@ class ExtractionResult:
     def has_text(self) -> bool:
         return any(block.text.strip() for page in self.pages for block in page.blocks)
 
+    @property
+    def pages_without_text(self) -> list[int]:
+        """Page numbers that yielded no text, in order: scans, blank pages, pages of pictures."""
+        return [page.number for page in self.pages if not any(block.text.strip() for block in page.blocks)]
+
+
+def no_text_warning(number: int) -> str:
+    return f"Halaman {number} tidak berisi teks yang bisa dibaca (kemungkinan hasil pindai)."
+
 
 # --- Tables -----------------------------------------------------------------------------------
 
@@ -181,7 +190,7 @@ def _outside(bboxes: list[tuple[float, float, float, float]]):
 
 def _extract_page(page: Any, number: int, warnings: list[str]) -> ExtractedPage:
     if not page.chars:
-        warnings.append(f"Halaman {number} tidak berisi teks yang bisa dibaca (kemungkinan hasil pindai).")
+        warnings.append(no_text_warning(number))
         return ExtractedPage(number=number, blocks=[])
 
     blocks: list[Block] = []
@@ -211,7 +220,7 @@ def _extract_with_pypdf(pdf_bytes: bytes) -> ExtractionResult:
     for index, page in enumerate(reader.pages, start=1):
         text = (page.extract_text() or "").strip()
         if not text:
-            warnings.append(f"Halaman {index} tidak berisi teks yang bisa dibaca (kemungkinan hasil pindai).")
+            warnings.append(no_text_warning(index))
             pages.append(ExtractedPage(number=index, blocks=[]))
             continue
         paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]

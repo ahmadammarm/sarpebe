@@ -6,7 +6,9 @@ import pytest
 from app.config import settings
 from app.core.services import ingestion_service
 from app.core.services.ingestion_service import IngestError, contextual_text, ingest_document
+from app.core.services.ocr_service import OcrResult
 from app.db.models.curriculum_document import CurriculumDocument
+from app.utils.pdf_extract import no_text_warning
 from tests.unit.test_pdf_extract import blank_pdf, build_pdf
 
 async_test = pytest.mark.asyncio(loop_scope="session")
@@ -119,10 +121,84 @@ async def test_ingest_stops_quietly_when_the_document_is_deleted_midway(document
     db.commit.assert_not_awaited()
 
 
+@pytest.fixture
+def ocr(mocker):
+    """Replaces the OCR call; set `ocr.return_value` to an OcrResult."""
+    return mocker.patch.object(ingestion_service.ocr_service, "read_pages", new_callable=AsyncMock)
+
+
 @async_test
-async def test_a_pdf_without_any_text_is_rejected_with_a_clear_message(document, embedded):
+async def test_a_scan_is_rejected_with_a_clear_message_when_ocr_is_off(document, embedded, ocr, mocker):
+    mocker.patch.object(settings, "ocr_enabled", False)
+
     with pytest.raises(IngestError, match="hasil pindai"):
         await ingest_document(FakeDb(document), document.id, blank_pdf(), USER_ID)
+
+    ocr.assert_not_awaited()
+
+
+@async_test
+async def test_scanned_pages_are_read_with_ocr_and_become_chunks(document, embedded, ocr):
+    ocr.return_value = OcrResult(texts={
+        1: "Elemen Pemahaman\n\nPeserta didik memahami interaksi pelaku ekonomi.\n\n| Elemen | Capaian |\n| --- | --- |\n| A | B |",
+    })
+    db = FakeDb(document)
+
+    result = await ingest_document(db, document.id, blank_pdf(), USER_ID)
+
+    assert ocr.await_args.args[1] == [1]
+    assert result.chunk_count == len(db.added) >= 2
+    assert {chunk.chunk_type for chunk in db.added} == {"text", "table"}
+    assert all(chunk.page_number == 1 for chunk in db.added)
+    assert document.ingest_warnings == ["1 halaman dibaca dengan OCR; periksa hasilnya."]
+    assert document.status == "completed"
+
+
+@async_test
+async def test_a_page_ocr_could_not_read_keeps_its_warning_while_others_are_indexed(document, embedded, ocr):
+    ocr.return_value = OcrResult(texts={1: "Peserta didik memahami interaksi pelaku ekonomi."}, failed=[2])
+
+    await ingest_document(FakeDb(document), document.id, blank_pdf(2), USER_ID)
+
+    assert document.ingest_warnings == [
+        no_text_warning(2),
+        "1 halaman dibaca dengan OCR; periksa hasilnya.",
+    ]
+
+
+@async_test
+async def test_a_blank_page_is_not_counted_as_read(document, embedded, ocr):
+    ocr.return_value = OcrResult(texts={1: "Peserta didik memahami interaksi pelaku ekonomi.", 2: ""})
+
+    await ingest_document(FakeDb(document), document.id, blank_pdf(2), USER_ID)
+
+    assert document.ingest_warnings == [no_text_warning(2), "1 halaman dibaca dengan OCR; periksa hasilnya."]
+
+
+@async_test
+async def test_ocr_is_limited_to_the_configured_number_of_pages(document, embedded, ocr, mocker):
+    mocker.patch.object(settings, "ocr_max_pages", 2)
+    ocr.return_value = OcrResult(texts={1: "Isi halaman satu tentang ekonomi.", 2: "Isi halaman dua tentang ekonomi."})
+
+    await ingest_document(FakeDb(document), document.id, blank_pdf(4), USER_ID)
+
+    assert ocr.await_args.args[1] == [1, 2]
+    assert "OCR hanya membaca 2 halaman pertama yang tidak berisi teks; sisanya dilewati." in document.ingest_warnings
+    assert no_text_warning(3) in document.ingest_warnings and no_text_warning(4) in document.ingest_warnings
+
+
+@async_test
+async def test_a_scan_ocr_could_not_read_at_all_is_rejected(document, embedded, ocr):
+    ocr.return_value = OcrResult(failed=[1])
+
+    with pytest.raises(IngestError, match="OCR belum berhasil"):
+        await ingest_document(FakeDb(document), document.id, blank_pdf(), USER_ID)
+
+
+@async_test
+async def test_a_pdf_with_a_text_layer_never_calls_ocr(document, embedded, ocr):
+    await ingest_document(FakeDb(document), document.id, build_pdf(), USER_ID)
+    ocr.assert_not_awaited()
 
 
 @async_test

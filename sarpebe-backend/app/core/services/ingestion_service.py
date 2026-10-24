@@ -8,12 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.core.exceptions import AppError
 from app.core.services.embedding_service import embedding_service
+from app.core.services.ocr_service import ocr_service
 from app.db.models.curriculum_document import CurriculumDocument
 from app.db.models.document_chunk import DocumentChunk
 from app.db.repositories.curriculum_document_repository import curriculum_document_repo
-from app.utils.chunking import chunk_document
+from app.utils.chunking import blocks_from_plain_text, chunk_document
 from app.utils.fase import fase_for_grade
-from app.utils.pdf_extract import extract_pdf
+from app.utils.pdf_extract import ExtractionResult, extract_pdf, no_text_warning
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,38 @@ class IngestResult:
     chunk_count: int
     warnings: list[str]
     aborted: bool = False  # the document was deleted while it was being processed
+
+
+NO_TEXT_MESSAGE = "PDF tidak berisi teks yang bisa dibaca. File hasil pindai belum didukung."
+NO_TEXT_AFTER_OCR_MESSAGE = (
+    "PDF tidak berisi teks yang bisa dibaca, dan OCR belum berhasil membaca halamannya. "
+    "Coba proses ulang nanti atau unggah PDF yang lebih jelas."
+)
+
+
+async def apply_ocr(extraction: ExtractionResult, pdf_bytes: bytes, user_id: UUID) -> None:
+    """
+    Fills pages that have no text layer with an OCR transcription, up to `ocr_max_pages` pages.
+    Pages that are read lose their "no text" warning; pages that could not be read, or are past
+    the limit, keep it. Blank pages stay empty and keep it too.
+    """
+    unreadable = extraction.pages_without_text
+    selected = unreadable[: settings.ocr_max_pages]
+    result = await ocr_service.read_pages(pdf_bytes, selected, user_id)
+
+    pages = {page.number: page for page in extraction.pages}
+    read = [number for number, text in result.texts.items() if text]
+    for number in read:
+        pages[number].blocks = blocks_from_plain_text(result.texts[number], number)
+
+    read_warnings = {no_text_warning(number) for number in read}
+    extraction.warnings = [warning for warning in extraction.warnings if warning not in read_warnings]
+    if read:
+        extraction.warnings.append(f"{len(read)} halaman dibaca dengan OCR; periksa hasilnya.")
+    if len(unreadable) > len(selected):
+        extraction.warnings.append(
+            f"OCR hanya membaca {len(selected)} halaman pertama yang tidak berisi teks; sisanya dilewati."
+        )
 
 
 def contextual_text(
@@ -77,8 +110,13 @@ async def ingest_document(
     except Exception as error:  # both readers failed: the file is corrupt or not a PDF
         logger.warning("Could not read PDF for document %s: %s", document_id, error)
         raise IngestError("PDF tidak dapat dibaca. File mungkin rusak.") from error
+
+    if settings.ocr_enabled and extraction.pages_without_text:
+        await apply_ocr(extraction, pdf_bytes, user_id)
     if not extraction.has_text:
-        raise IngestError("PDF tidak berisi teks yang bisa dibaca. File hasil pindai belum didukung.")
+        raise IngestError(
+            NO_TEXT_AFTER_OCR_MESSAGE if settings.ocr_enabled else NO_TEXT_MESSAGE
+        )
 
     chunks = chunk_document(extraction)
     if not chunks:

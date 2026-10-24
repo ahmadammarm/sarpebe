@@ -237,6 +237,33 @@ def chunk_document(
     return chunks
 
 
+def blocks_from_plain_text(text: str, page: int) -> list[Block]:
+    """
+    Blocks for text that has no layout information (a PDF fallback, an OCR transcription):
+    paragraphs separated by blank lines, and runs of lines starting with "|" as Markdown tables.
+    """
+    blocks: list[Block] = []
+
+    def add(kind: Literal["text", "table"], lines: list[str]) -> None:
+        if lines:
+            blocks.append(Block(kind=kind, text="\n".join(lines).strip(), page=page, top=float(len(blocks))))
+
+    for paragraph in re.split(r"\n\s*\n", text.strip()):
+        run: list[str] = []
+        run_is_table = False
+        for line in (raw.strip() for raw in paragraph.splitlines()):
+            if not line:
+                continue
+            is_table_line = line.startswith("|")
+            if run and is_table_line != run_is_table:
+                add("table" if run_is_table else "text", run)
+                run = []
+            run_is_table = is_table_line
+            run.append(line)
+        add("table" if run_is_table else "text", run)
+    return blocks
+
+
 def semantic_chunk_text(pages: list[dict[str, Any]], max_chars: int = MAX_CHARS) -> list[dict[str, Any]]:
     """
     Chunks plain page text ({"page_number", "text"}) without font information, so headings are
@@ -245,8 +272,7 @@ def semantic_chunk_text(pages: list[dict[str, Any]], max_chars: int = MAX_CHARS)
     extraction_pages = []
     for page in pages:
         number = page.get("page_number", 1)
-        paragraphs = [p.strip() for p in re.split(r"\n\s*\n", page.get("text", "").strip()) if p.strip()]
-        blocks = [Block(kind="text", text=p, page=number, top=float(i)) for i, p in enumerate(paragraphs)]
+        blocks = blocks_from_plain_text(page.get("text", ""), number)
         extraction_pages.append(ExtractedPage(number=number, blocks=blocks))
 
     chunks = chunk_document(ExtractionResult(pages=extraction_pages), max_chars=max_chars)
