@@ -21,8 +21,15 @@ Request bodies that fail Pydantic validation return FastAPI's standard `422` wit
 | `invalid_refresh_token` | 401 | Refresh token unknown, expired, revoked, or replayed after the grace window. |
 | `email_not_verified` | 403 | Correct password but the address is not verified (only when verification is required). |
 | `too_many_attempts` | 429 | Login lockout after repeated failures. |
+| `quota_exceeded` | 429 | The user has started all the lesson plans allowed in the last 24 hours. |
 | `invalid_email_token` | 400 | Verification or reset link invalid, used, or expired. |
 | `not_owner` | 403 | Resource belongs to another user. |
+| `forbidden` | 403 | The endpoint needs the admin role. |
+| `account_disabled` | 403 | An administrator disabled the account. Raised at login (after a correct password), at refresh, and on any request that carries its access token. |
+| `invalid_password` | 400 | The current password given for changing the password or deleting the account is wrong. Never 401, so a client does not mistake it for an expired session. |
+| `user_not_found` | 404 | An administrator named a user that does not exist. |
+| `last_admin` | 409 | The action would leave no active administrator (demoting, disabling or deleting the last one). |
+| `self_action_forbidden` | 409 | An administrator tried to change their own role or status, or to delete themselves through the admin endpoint. |
 | `lesson_plan_not_found` | 404 | No such plan or job for this user. |
 | `document_not_found` | 404 | No such curriculum document. |
 | `invalid_state` | 409 | Action not allowed in the resource's current status (for example exporting an unfinished plan). |
@@ -76,11 +83,38 @@ Body: `{ "token", "password" }`. Sets the password, marks the email verified, in
 ### `GET /api/users/me`
 The current profile: `id`, `email`, `full_name`, `school_name`, `subscription_tier`, `role`, `created_at`.
 
+### `PATCH /api/users/me`
+Body with `full_name` (2 to 100 characters, trimmed) and/or `school_name` (up to 150 characters; an empty string clears it); at least one is required. Role and tier cannot be changed here. Returns the profile.
+
+### `POST /api/users/me/change-password` (204)
+Body: `{ "current_password", "new_password" }` (the new one follows the usual rules: 8 characters, 72 bytes). Sets the new password, cancels unused reset links, and revokes every refresh token of the user, this device included, so the client must sign in again. Errors: `invalid_password` (400), `too_many_attempts` (429 after 5 wrong passwords in 15 minutes, counted together with account deletion).
+
+### `DELETE /api/users/me` (204)
+Body: `{ "password" }`. Deletes the account with its lesson plans, cost logs and sessions. Errors: `invalid_password`, `too_many_attempts`, `last_admin` (the only active administrator cannot delete themselves).
+
+### `GET /api/users/me/quota`
+How many lesson plans the user can still start:
+
+```json
+{ "limit": 10, "used": 7, "remaining": 3, "unlimited": false, "resets_at": "2026-10-25T08:30:00Z" }
+```
+
+`limit` and `remaining` are `null` and `unlimited` is `true` for admins, accounts on a tier other than `free`, and when `GENERATION_DAILY_LIMIT_FREE` is 0. The window is the last 24 hours and plans that failed are not counted. `resets_at` is when the oldest counted plan leaves the window and a slot frees up, or `null` if none is counted.
+
 ### `GET /api/users/me/costs`
 Aggregated model usage of the current user: `{ "prompt_tokens": int, "completion_tokens": int, "total_cost": number }`.
 
 ### `GET /api/users/costs` (admin)
 A list of `{ user_id, prompt_tokens, completion_tokens, total_cost }`, one per user.
+
+### `GET /api/users?skip=0&limit=20&q=&role=` (admin)
+`{ items, total, skip, limit }`, newest accounts first. `q` matches part of the name or email, ignoring case (at most 100 characters); `role` is `user` or `admin`. Each item has the profile fields plus `email_verified_at` and `disabled_at` (null while the account is active). Password hashes are never returned.
+
+### `PATCH /api/users/{id}` (admin)
+Body with any of `role` (`user`, `admin`), `subscription_tier` (`free`, `premium`) and `disabled` (boolean); at least one is required. Disabling signs the account out everywhere. Nobody can change their own role or status (`self_action_forbidden`), and the last active administrator cannot be demoted or disabled (`last_admin`). Returns the account. Error: `user_not_found`.
+
+### `DELETE /api/users/{id}` (admin, 204)
+Deletes another account with its lesson plans, cost logs and sessions. Errors: `user_not_found`, `self_action_forbidden` (use `DELETE /api/users/me` for your own account).
 
 ## Curriculum documents (admin)
 
@@ -89,13 +123,20 @@ A list of `{ user_id, prompt_tokens, completion_tokens, total_cost }`, one per u
 
 ```json
 { "id": "uuid", "title": "CP IPS.pdf", "document_type": "CP", "url_path": "https://...",
-  "grade_level": "9", "subject": "ips", "status": "processing", "uploaded_at": "..." }
+  "grade_level": "9", "subject": "ips", "status": "processing", "ingest_version": 2,
+  "ingest_warnings": null, "uploaded_at": "..." }
 ```
 
-`status` becomes `completed` or `failed`. Poll `GET /api/curriculum` for it.
+`status` becomes `completed` or `failed`. Poll `GET /api/curriculum` for it. `ingest_warnings` lists page warnings for a completed document (for example "2 halaman dibaca dengan OCR; periksa hasilnya.") and holds the reason when `status` is `failed`.
 
-### `GET /api/curriculum`
-List of all documents (same shape).
+### `GET /api/curriculum?skip=0&limit=20`
+`{ items, total, skip, limit }` with documents newest first (same shape as above). `skip` is at least 0 and `limit` is 1 to 100.
+
+### `PATCH /api/curriculum/{id}`
+Body with any of `title`, `document_type`, `grade_level`, `subject`; at least one is required. Labels are normalized as at upload. Returns the document. A new `grade_level` or `subject` sets `status` to `processing` and processes the document again; a new title or type changes the row only. Errors: `document_not_found`, `invalid_state` (409) while the document is processing, 422 for an empty or invalid body.
+
+### `POST /api/curriculum/{id}/reindex` (202)
+Reads the stored PDF again and replaces the document's chunks (also retries a failed document). Returns the document with `status: "processing"`. Errors: `document_not_found`, `invalid_state` (409) while it is already processing.
 
 ### `DELETE /api/curriculum/{id}` (204)
 Deletes the document, its chunks (cascade), and the stored file. Error: `document_not_found`.
@@ -117,7 +158,7 @@ Body:
 | `teaching_model` | enum | `otomatis` (default), `diskusi_kelompok`, `pjbl`, `pbl`, `inkuiri`, `kooperatif`, `ceramah_interaktif`. |
 | `class_notes` | string | Up to 500 characters, trimmed, default empty. |
 
-Response: `{ "job_id": "string", "id": "uuid" }`. The plan row exists immediately with `status: "pending"`.
+Response: `{ "job_id": "string", "id": "uuid" }`. The plan row exists immediately with `status: "pending"`. Error: `quota_exceeded` (429) when the user has started `GENERATION_DAILY_LIMIT_FREE` plans in the last 24 hours (see `GET /api/users/me/quota`).
 
 ### `GET /api/lesson-plans?skip=0&limit=20`
 `{ "items": [LessonPlan], "total": int, "skip": int, "limit": int }`, newest first.
@@ -136,7 +177,7 @@ A `LessonPlan`:
 }
 ```
 
-`status` is `pending`, `processing`, `completed`, or `failed`. For a failed plan `generated_content` is `{ "error": "<message>" }`.
+`status` is `pending`, `processing`, `completed`, or `failed`. For a failed plan `generated_content` is `{ "error": "<Indonesian message>", "code": "<failure code>" }` (`code` is absent on plans that failed before codes existed).
 
 `generated_content` depends on `schema_version`:
 
@@ -150,17 +191,20 @@ Body: `{ "generated_content": { ... } }`. The content is validated against the p
 Deletes the plan. Its cost log rows stay with `lesson_plan_id` set to null.
 
 ### `GET /api/lesson-plans/{id}/export/pdf`
-Returns `application/pdf` with `Content-Disposition: attachment`. Version 1 plans use the original layout; version 2 plans export every section with real tables (header row repeated across pages). Only completed plans can be exported (`invalid_state` otherwise).
+Returns `application/pdf` with `Content-Disposition: attachment`; the file name is built from the topic with only ASCII letters, digits, dot, dash and underscore (`safe_filename`). Version 1 plans use the original layout; version 2 plans export every section with real tables (header row repeated across pages). Only completed plans can be exported (`invalid_state` otherwise).
+
+### `GET /api/lesson-plans/{id}/export/docx`
+Returns the module as a Word document (`application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `Content-Disposition: attachment`, same name rules as the PDF). Only plans in the current format (`schema_version` 2) have it; an older plan, or one that is not completed, returns `invalid_state` (409).
 
 ### `GET /api/lesson-plans/jobs/{job_id}`
 Current job state, read from the plan row:
 
 ```json
 { "job_id": "string", "status": "processing", "stage": "drafting",
-  "lesson_plan_id": "uuid", "error": null }
+  "lesson_plan_id": "uuid", "error": null, "error_code": null }
 ```
 
-`stage` is set only while `status` is `processing`: `retrieving`, `drafting`, or `repairing`. `error` is set when `status` is `failed`. A plan unfinished after 15 minutes is reported as failed with a timeout message.
+`stage` is set only while `status` is `processing`: `retrieving`, `drafting`, or `repairing`. `error` (Indonesian text) and `error_code` (`insufficient_context`, `llm_output_invalid`, `content_blocked`, `llm_unavailable`, `internal_error`, `timeout`) are set when `status` is `failed`. A plan unfinished after 15 minutes is reported as failed with code `timeout`.
 
 ### `GET /api/lesson-plans/jobs/{job_id}/stream`
 The same object as Server-Sent Events, one `data: {json}` event per second until a terminal status, then the stream ends. Ownership is checked before the stream opens (404 otherwise). Because `EventSource` cannot send headers, clients read it with `fetch` and the bearer token (see `streamJobStatus` in `lib/api/lesson-plans.ts`) and fall back to polling the endpoint above.

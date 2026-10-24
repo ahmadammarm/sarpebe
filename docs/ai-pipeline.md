@@ -25,6 +25,9 @@ worker (process_curriculum_document_task)
   pdf_extract.extract_pdf        pdfplumber per page: tables -> Markdown, other text in reading order
                                  any pdfplumber error -> pypdf fallback
                                  pages without text -> warnings ("mungkin hasil pindai")
+  ocr_service.read_pages         pages without text are rendered to PNG (pypdfium2) and transcribed by the OCR model,
+                                 at most OCR_MAX_PAGES pages, OCR_CONCURRENCY at a time; a page read this way loses its
+                                 warning and the document gets "N halaman dibaca dengan OCR; periksa hasilnya."
   no text at all                 -> document failed with a clear message
   chunking.chunk_document        keeps a heading path; each table is its own chunk (long tables split by rows,
                                  header repeated); prose cut near 1,500 characters with overlap;
@@ -38,8 +41,9 @@ worker (process_curriculum_document_task)
 Notes:
 
 - The unit of retrieval is a chunk with a `chunk_type` of `text` or `table`, a `heading`, a page range, labels, an embedding, and a generated `search_vector` for keyword search.
-- Scanned PDFs are detected and reported but not OCR'd.
-- Re-ingest existing documents with `python -m scripts.reindex_documents --all`. It is idempotent: it deletes the document's chunks and rebuilds them.
+- Scanned pages are read with OCR (`app/core/services/ocr_service.py`, prompt in `app/core/prompts/ocr.py`, settings in [configuration.md](configuration.md)). Each page is one vision call through `generate_structured` with `operation_type="ocr"`, temperature 0, and the page image as the only data in the user turn; the instructions are in `system_instruction`. The transcription goes through the same chunking as a text PDF (Markdown table lines become table chunks). A page the model refuses or cannot answer is skipped and keeps its "no text" warning; if no page yields text the document fails. Blank pages stay empty. OCR output can contain mistakes, so the warning tells the admin to check it. `OCR_ENABLED=false` restores the old behaviour: a PDF without any text is rejected.
+- Re-ingest existing documents with `python -m scripts.reindex_documents --all`, or from the admin page (`POST /api/curriculum/{id}/reindex`). It is idempotent: it deletes the document's chunks and rebuilds them in one transaction, so a failed re-ingest leaves the old chunks in place.
+- Editing a document's grade or subject (`PATCH /api/curriculum/{id}`) re-ingests it, because both are part of every chunk's embedded text and of the retrieval pre-filter.
 
 ## Flow 2: retrieval
 
@@ -109,14 +113,15 @@ Design points:
 |---|---|---|---|---|
 | No document for the kelas and mapel | `InsufficientContextError` | No | failed | "Belum ada dokumen kurikulum untuk kelas dan mata pelajaran ini." |
 | Documents do not cover the topic | `InsufficientContextError` | No | failed | "Dokumen kurikulum yang tersedia belum membahas topik ini." |
-| Output invalid after one repair | `LLMOutputError` | No | failed | "Model belum menghasilkan modul yang valid, bahkan setelah diperbaiki. Coba buat ulang." |
-| Truncated or empty output | `LLMOutputError` | No | failed | Specific text from `ensure_usable`. |
-| Safety or recitation block | `ContentBlockedError` | No | failed | Specific text from `ensure_usable`. |
-| Model API stays down after its own retries | `TransientLLMError` | No | failed | "Layanan model sedang sibuk. Coba lagi sebentar lagi." |
-| Infrastructure fault (database, Redis, bug) | any other | Celery once, after 30 s | failed on the last attempt | Technical text; the UI shows a generic message. |
-| Unfinished for 15 minutes | - | - | reported failed | "Pembuatan modul ajar melebihi batas waktu." |
+| Output invalid after one repair, truncated or empty output | `LLMOutputError` | No | failed | "Model belum menghasilkan modul yang valid. Coba buat ulang." |
+| Safety or recitation block | `ContentBlockedError` | No | failed | "Model tidak dapat menyusun modul untuk topik ini. Ubah topiknya lalu coba lagi." |
+| Model API stays down after its own retries | `TransientLLMError` | No | failed | "Layanan penyusun modul sedang tidak tersedia. Coba lagi beberapa saat lagi." |
+| Infrastructure fault (database, Redis, bug) | any other | Celery once, after 30 s | failed on the last attempt | "Modul belum berhasil disusun karena gangguan sistem. Coba lagi." (code `internal_error`; the exception text is only logged). |
+| Unfinished for 15 minutes | - | - | reported failed | "Pembuatan modul ajar melebihi batas waktu." (code `timeout`) |
 
-Retry policy: `call_with_retry` (tenacity) retries only transient API errors (429, 408, 5xx, timeouts), `LLM_MAX_ATTEMPTS` times with exponential backoff. Permanent errors are not retried, so a job costs at most a few model calls instead of nine. The frontend maps messages in `lib/utils/lesson-plan.ts` (`describeFailure`).
+A failed plan stores `generated_content = {"error": "<Indonesian message>", "code": "<stable code>"}`. Only `InsufficientContextError` passes its own text through (it is written for the teacher); every other error maps to a fixed message in `FAILURE_MESSAGES` (`app/tasks/generation_tasks.py`), because exception text is English developer text and may carry internal detail. Plans saved before codes existed have no `code`.
+
+Retry policy: `call_with_retry` (tenacity) retries only transient API errors (429, 408, 5xx, timeouts), `LLM_MAX_ATTEMPTS` times with exponential backoff. Permanent errors are not retried, so a job costs at most a few model calls instead of nine. The frontend chooses its wording from the `code` in `lib/utils/lesson-plan.ts` (`describeFailure`) and never shows the backend's text as is.
 
 ## Flow 5: cost logging
 
@@ -126,6 +131,7 @@ Every call that reaches the model logs a row in `llm_cost_logs` through `app/cor
 |---|---|
 | `embedding` | Document chunks and queries. |
 | `rerank` | The relevance scoring call. |
+| `ocr` | One scanned page read at ingestion. |
 | `generation` | The main structured call. |
 | `repair` | The one repair call. |
 | `eval` | Offline evaluations. |
@@ -137,6 +143,8 @@ Fields: user, optional plan, operation, prompt tokens, completion tokens (thinki
 - The editor chooses its renderer from `schema_version`. Version 2 shows every section, tables editable cell by cell, sources as highlighted chips, warnings in a notice, and a running total of minutes per meeting.
 - `PUT /api/lesson-plans/{id}` validates edited content against `ModulContent` (422 `invalid_content` on failure) so a bad edit cannot corrupt a plan.
 - `GET /api/lesson-plans/{id}/export/pdf` routes by `schema_version`: `generate_modul_pdf` (fpdf2 tables with a repeating header, bundled DejaVu fonts for Indonesian punctuation) or the original `generate_lesson_plan_pdf`.
+- `GET /api/lesson-plans/{id}/export/docx` exists for version 2 only (`generate_modul_docx`, python-docx): the same sections in the same order, Word heading styles for the outline, tables with a repeating header row, page numbers in the footer, and numbers written out per list so each list starts at 1. Control characters in model text are stripped because Word's XML cannot hold them. Older plans are PDF-only (`invalid_state`).
+- Both exports are rendered in a thread (`asyncio.to_thread`) so a large module does not block the event loop, and their file names come from `safe_filename`.
 
 ## Job stages
 

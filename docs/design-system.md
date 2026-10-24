@@ -40,6 +40,8 @@ Inputs use 16 px (`text-base`) so iOS does not zoom on focus.
 | `<Notice>` | Inline message with tone `error`, `success`, or `info`. Errors say what went wrong; the caller adds how to fix it. |
 | `<Field>`, `<PasswordField>` | Label, input, and hint or error wired together with `aria-describedby`. Use them instead of loose inputs. |
 | `EditableTable` | Cell-by-cell table editor; a real table from `sm`, labelled cards below it. |
+| `ConfirmDialog` | A modal confirmation on the native `<dialog>` (focus trapped, Escape and a click on the backdrop dismiss it, the page behind is inert). Its content is a form, so Enter confirms and extra fields (a password) go in `children`; `pending` locks it while the request runs. The backdrop is a fixed `bg-black/50`. |
+| `Pagination` | Previous and next buttons with "Halaman N dari M"; renders nothing for a single page. Takes a zero-based `page`, `pageCount`, `onPageChange`. |
 | `FaseTag` | Shows the Kurikulum Merdeka fase for a class number. |
 | `buttonVariants()` | Apply to a `<Link>` for link-styled buttons; do not nest a `<Button>` in a link. |
 

@@ -29,8 +29,10 @@ Symptoms, causes, and fixes, ordered by area. Most come from problems that actua
 | Symptom | Cause | Fix |
 |---|---|---|
 | "File tidak dapat diunggah" | Not a real PDF (header check), larger than `MAX_UPLOAD_MB`, or Storage failed. | Check the file; check the bucket `sarpebe-storage` exists and is public; check the service role key. |
-| Document ends `failed` | See the reason in `ingest_warnings`: unreadable PDF, no text (scanned file), or an unexpected error (see the worker log). | Re-export the PDF with selectable text; scanned PDFs are not OCR'd. Then upload again. |
-| Completed but with page warnings | Some pages contain no text (probably scans). | Acceptable if those pages are not needed; otherwise replace the file. |
+| Document ends `failed` | See the reason in `ingest_warnings`: unreadable PDF, no text and OCR could not read the pages, or an unexpected error (see the worker log). | For a scan, press "Proses ulang" once the model API is reachable, or upload a clearer file. Check `OCR_ENABLED` and `GEMINI_OCR_MODEL` if OCR never succeeds. |
+| Completed with "N halaman dibaca dengan OCR" | Those pages were scans and were transcribed by the model. | Read the document's chunks or a generated module for mistakes (numbers, table cells); replace the file with a text PDF if accuracy matters. |
+| Completed but with "tidak berisi teks" warnings | Those pages could not be read: past `OCR_MAX_PAGES`, blank, refused by the model, or OCR is off. | Acceptable if those pages are not needed; otherwise raise `OCR_MAX_PAGES`, reprocess, or replace the file. |
+| OCR is slow or fails with rate limits | `OCR_CONCURRENCY` pages are sent at once. | Lower `OCR_CONCURRENCY`; transient errors are retried up to `LLM_MAX_ATTEMPTS` times and then the page is skipped. |
 | Chunks lack headings or tables after an upgrade | The document was ingested by version 1. | `python -m scripts.reindex_documents --all`. |
 
 ## Generating plans

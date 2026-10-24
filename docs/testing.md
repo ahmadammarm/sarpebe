@@ -2,7 +2,7 @@
 
 ## Backend
 
-Framework: pytest with pytest-asyncio (`asyncio_mode = auto`), pytest-mock, and httpx for API tests. Configuration is in `sarpebe-backend/pytest.ini`. About 350 tests run in under 20 seconds and need no network, no Gemini key, no Redis, and no PostgreSQL.
+Framework: pytest with pytest-asyncio (`asyncio_mode = auto`), pytest-mock, and httpx for API tests. Configuration is in `sarpebe-backend/pytest.ini`. About 520 tests run in under 40 seconds and need no network, no Gemini key, no Redis, and no PostgreSQL.
 
 ```bash
 # from sarpebe-backend/, virtual environment active
@@ -36,11 +36,11 @@ tests/
 
 | Area | Test files |
 |---|---|
-| Authentication | `test_security.py`, `test_auth_service.py`, `integration/test_auth_api.py`, `test_seed_users.py` |
-| Ingestion | `test_pdf_extract.py` (builds a PDF with a table in the test), `test_chunking.py`, `test_ingestion_service.py`, `test_embedding_service.py`, `test_labels.py` |
+| Authentication and accounts | `test_security.py`, `test_auth_service.py`, `test_user_service.py`, `integration/test_auth_api.py`, `integration/test_user_management_api.py`, `test_seed_users.py` |
+| Ingestion | `test_pdf_extract.py` (builds a PDF with a table in the test), `test_chunking.py`, `test_ingestion_service.py`, `test_ocr_service.py` (renders real pages with pypdfium2, the model call is mocked), `test_curriculum_task.py`, `test_embedding_service.py`, `test_labels.py`, `test_text.py` |
 | Retrieval | `test_retrieval.py` (fusion, floor, rerank, passage selection, query), `test_fase.py` |
 | Generation | `test_lesson_plan_prompt.py`, `test_lesson_plan_content.py`, `test_lesson_plan_checks.py`, `test_llm_client.py`, `test_llm_service.py`, `test_generation_task.py` |
-| Plans and export | `test_lesson_plan_service.py`, `test_modul_pdf.py`, `integration/test_lesson_plans_api.py`, `integration/test_curriculum_api.py`, `integration/test_api.py` |
+| Plans, quota and export | `test_lesson_plan_service.py`, `test_quota_service.py`, `test_modul_pdf.py`, `test_modul_docx.py` (opens the result with python-docx), `integration/test_lesson_plans_api.py` (including real PDF and Word downloads), `integration/test_curriculum_api.py`, `integration/test_users_api.py`, `integration/test_api.py` |
 | Costs | `test_cost_calculator.py`, `test_cost_logging.py` |
 | Evaluation helpers | `test_evals.py` (pure functions only) |
 
@@ -75,6 +75,7 @@ Check behaviour manually in a browser for UI work. If a test runner is added lat
 
 ## Known gaps
 
-- No PostgreSQL-backed tests: pgvector search, full-text search and row locking are exercised only against a real database by hand or by the evaluations.
+- No PostgreSQL-backed tests: pgvector search, full-text search and row locking are exercised only against a real database by hand or by the evaluations. This includes the locks behind the generation quota and the last-administrator guard, and the cascade that deletes an account's plans and cost logs (the SQLite test database has only the account tables).
+- OCR quality is not tested: the tests check rendering, limits and error handling with the model call mocked. Try one scanned PDF by hand after changing the OCR model or prompt.
 - No browser or component tests for the frontend.
 - No load tests for concurrent generation.

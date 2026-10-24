@@ -1,6 +1,6 @@
 # SARPEBE Frontend
 
-Next.js web application for SARPEBE: landing page, account flows, lesson plan creation with live progress, a full Modul Ajar editor with editable tables and PDF export, and curriculum document management for administrators. All text is Indonesian.
+Next.js web application for SARPEBE: landing page, account flows, lesson plan creation with live progress, a full Modul Ajar editor with editable tables and PDF or Word export, and curriculum document management for administrators. All text is Indonesian.
 
 This file is a short orientation. The full documentation is in the repository's [docs](../docs/README.md) folder.
 

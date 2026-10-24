@@ -31,7 +31,7 @@ Components and what each owns:
 | Component | Responsibility |
 |---|---|
 | Next.js app | Pages, forms, editors, session (NextAuth), job tracking (SSE with polling fallback). |
-| FastAPI | Authentication, authorization, validation, job creation, reading plans, PDF export. |
+| FastAPI | Authentication, authorization, validation, job creation, reading plans, PDF and Word export. |
 | Celery worker | Document ingestion and lesson plan generation, which are too slow for a request. |
 | Redis | Celery broker and result backend, plus login rate-limit counters. |
 | PostgreSQL + pgvector | All data: users, tokens, documents, chunks and embeddings, plans, cost logs. |
@@ -68,7 +68,7 @@ Supporting modules:
 | `app/core/storage.py` | Supabase Storage upload, public URL, delete. |
 | `app/schemas/` | Pydantic request and response models. `lesson_plan_content.py` is the Modul Ajar schema. |
 | `app/tasks/` | Celery app and the two tasks (`generation_tasks.py`, `curriculum_tasks.py`). |
-| `app/utils/` | Pure helpers: PDF reading, chunking, labels, fase mapping, cost math, PDF export. |
+| `app/utils/` | Pure helpers: PDF reading, chunking, labels, fase mapping, cost math, PDF and Word export. |
 | `evals/` | Offline evaluation harness (not part of the running service). |
 | `scripts/` | Operator scripts: seed users, create or upgrade a user, reindex documents. |
 

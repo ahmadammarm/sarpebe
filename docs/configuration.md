@@ -23,6 +23,16 @@ All backend settings are fields of `Settings` in `sarpebe-backend/app/config.py`
 | `GEMINI_EMBEDDING_MODEL` | `gemini-embedding-2` | Document and query embeddings (truncated to 768 dimensions). |
 | `GEMINI_RERANK_MODEL` | `gemini-2.5-flash-lite` | Scores passage relevance. Small and cheap on purpose. |
 | `GEMINI_JUDGE_MODEL` | `gemini-3.8-flash` | Only used by `python -m evals.run generation --judge`. |
+| `GEMINI_OCR_MODEL` | `gemini-3.5-flash-lite` | Reads scanned pages during ingestion. Needs an entry in `app/utils/cost_calculator.py` to be priced. |
+
+### OCR (ingestion of scanned PDFs)
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `OCR_ENABLED` | true | Read pages that have no text layer with the OCR model. When false, a PDF without any text is rejected. |
+| `OCR_MAX_PAGES` | 60 | Most pages sent to OCR per document (counted among the pages without text). Bounds the cost of one upload; pages past the limit are skipped with a warning. |
+| `OCR_RENDER_DPI` | 150 | Resolution a page is rendered at before it is sent (72 to 300). Higher reads small print better and costs more tokens. |
+| `OCR_CONCURRENCY` | 4 | Pages read at the same time (1 to 16). Lower it if the model API returns rate-limit errors. |
 
 ### Retrieval
 
@@ -46,6 +56,7 @@ All backend settings are fields of `Settings` in `sarpebe-backend/app/config.py`
 | `GENERATION_TEMPERATURE` | unset | Unset means the model default. |
 | `PROMPT_VERSION` | `lesson_plan.v2` | Stored on every plan. Change it whenever the prompt or schema changes. |
 | `LLM_MAX_ATTEMPTS` | 3 | Attempts per model call for transient errors only (429, 408, 5xx, timeouts). |
+| `GENERATION_DAILY_LIMIT_FREE` | 10 | Modules a teacher on the `free` tier may start within any 24 hours. Plans that failed do not count. `0` removes the limit. Admins and accounts on any other `subscription_tier` are never limited. |
 
 ### Authentication
 
@@ -91,6 +102,7 @@ Defined in `sarpebe-frontend/.env.local` (copy `.env.local.example`). Never comm
 | `NEXT_PUBLIC_API_BASE_URL` | Backend base URL, used by the browser and by NextAuth on the server. |
 | `NEXTAUTH_URL` | Public URL of the frontend. |
 | `NEXTAUTH_SECRET` | Signs the session cookie, which also carries the access and refresh tokens. Required. |
+| `NEXT_PUBLIC_SITE_URL` | Optional. Public address used in the sitemap, the canonical link and the share image. Falls back to `NEXTAUTH_URL`, so set it only when the two differ. No trailing slash. It is read at build time. |
 
 ## Fixed values worth knowing
 

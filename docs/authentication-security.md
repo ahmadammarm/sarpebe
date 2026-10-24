@@ -5,15 +5,18 @@ Authentication is implemented by the backend (`app/api/routers/auth.py`, `app/co
 ## Accounts and roles
 
 - A `profiles` row is an account. `email` is stored lower-case; `password_hash` is a bcrypt hash; `email_verified_at` is set once the address is proven.
-- Roles: `user` (teacher, default) and `admin`. Admin-only routes use the `require_admin` dependency in `app/api/deps.py`: document upload, list, delete, and the all-users cost report. The frontend also redirects non-admins away from `/curriculum` (`proxy.ts`), but that is convenience only; the backend is the enforcement point.
+- Roles: `user` (teacher, default) and `admin`. Admin-only routes use the `require_admin` dependency in `app/api/deps.py` (it answers `403 forbidden`): curriculum management, the all-users cost report, and user management (list, change role, tier or status, delete). The frontend also redirects non-admins away from `/curriculum` and `/admin` (`proxy.ts`), but that is convenience only; the backend is the enforcement point.
 - Accounts imported from the former Supabase Auth keep their ids and bcrypt hashes (migration `b7e2f4a91c35`). An account with a null `password_hash` has no password until it uses password reset.
-- Create accounts with `python -m scripts.seed_users`, `scripts.create_user`, or by registering. Change a role with `scripts.upgrade_user`.
+- Create accounts with `python -m scripts.seed_users`, `scripts.create_user`, or by registering. Change a role with `scripts.upgrade_user`, or from the admin page.
+- An administrator can disable an account (`profiles.disabled_at`). A disabled account cannot sign in (`account_disabled`, revealed only after a correct password), its sessions are revoked at once, its refresh attempts are refused and close the login session, and `get_current_user` rejects its access token on the next request because the profile is loaded for every request. Enabling it again clears the flag.
+- Nobody can change their own role or status, and the last active administrator can never be demoted, disabled or deleted (the admin rows are locked with `SELECT ... FOR UPDATE` while this is checked).
 
 ## Passwords
 
 - bcrypt, hashed in a worker thread so the event loop is not blocked.
 - New passwords (register, reset) must be at least 8 characters and at most 72 bytes (bcrypt's limit). Login deliberately applies no strength rules, because imported accounts may have older, shorter passwords.
 - Registering hashes the password before checking whether the email exists, so the "already registered" path takes the same time as a new account. Login does the same dummy verification for unknown emails.
+- Changing the password (`POST /api/users/me/change-password`) and deleting the account (`DELETE /api/users/me`) both ask for the current password. Wrong guesses are counted in Redis per user (`LOGIN_MAX_FAILED_ATTEMPTS` within `LOGIN_LOCKOUT_MINUTES`, shared by the two actions); once locked, even the right password is refused with `too_many_attempts`. A successful change cancels unused reset links and revokes every refresh token, so the user signs in again everywhere. The wrong-password answer is `400 invalid_password`, never 401.
 - Hashes and tokens are never logged or returned.
 
 ## Tokens
@@ -54,7 +57,7 @@ Failed logins are counted in Redis per email: after `LOGIN_MAX_FAILED_ATTEMPTS` 
 
 ## The frontend session
 
-NextAuth (JWT strategy, credentials provider) calls `/api/auth/login`. The access and refresh tokens live inside the NextAuth session cookie, which is signed with `NEXTAUTH_SECRET`; they are never put in `localStorage`, and the refresh token is not exposed to browser code. `lib/authOptions.ts` renews the access token through `/api/auth/refresh` shortly before it expires and revokes the refresh token on sign out. If renewal is refused, the session gets an `error` flag and `SessionGuard` (`app/providers.tsx`) signs the user out. `lib/api/client.ts` attaches `Authorization: Bearer <accessToken>` to every request. `proxy.ts` (Next.js middleware) requires a session for `/lesson-plans` and `/curriculum`.
+NextAuth (JWT strategy, credentials provider) calls `/api/auth/login`. The access and refresh tokens live inside the NextAuth session cookie, which is signed with `NEXTAUTH_SECRET`; they are never put in `localStorage`, and the refresh token is not exposed to browser code. `lib/authOptions.ts` renews the access token through `/api/auth/refresh` shortly before it expires and revokes the refresh token on sign out. If renewal is refused, the session gets an `error` flag and `SessionGuard` (`app/providers.tsx`) signs the user out. `lib/api/client.ts` attaches `Authorization: Bearer <accessToken>` to every request. `proxy.ts` (Next.js middleware) requires a session for `/lesson-plans`, `/curriculum`, `/profile` and `/admin`. After the profile is saved, `useSession().update({ name })` lets the `jwt` callback in `lib/authOptions.ts` change the name in the session at once instead of at the next refresh.
 
 ## Authorization and data isolation
 
@@ -87,7 +90,7 @@ This reduces risk; it does not make a model immune. Teachers are told the plan i
 
 ## Known limits
 
-- Access tokens cannot be revoked before they expire (15 minutes); logout and reset revoke refresh tokens only.
+- A specific access token cannot be revoked before it expires (15 minutes); logout, password changes and resets revoke refresh tokens only. A deleted or disabled account is the exception: its tokens stop working immediately because the profile is checked on every request.
 - The Storage bucket is public, so a curriculum PDF is readable by anyone who has its URL. Curriculum documents are official public standards, so this is accepted; do not upload confidential files.
 - Rate limiting covers login and email actions only, not the rest of the API.
 - Email verification relies on `EMAIL_BACKEND=smtp` being configured in production.

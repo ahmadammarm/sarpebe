@@ -6,7 +6,7 @@ SARPEBE helps Indonesian teachers write a complete Modul Ajar (Kurikulum Merdeka
 
 ## What a generated module contains
 
-General information (identity, initial competencies, Pancasila profile, facilities, learning model), core components (learning objectives with sources, meaningful understanding, trigger questions, preparation), activities per meeting as tables with minutes that add up, assessment (diagnostic, formative, summative, overview and rubric tables), enrichment and remedial activities, reflection, and attachments (worksheet, reading material, glossary). The teacher edits everything in the browser, including table cells, and exports a PDF.
+General information (identity, initial competencies, Pancasila profile, facilities, learning model), core components (learning objectives with sources, meaningful understanding, trigger questions, preparation), activities per meeting as tables with minutes that add up, assessment (diagnostic, formative, summative, overview and rubric tables), enrichment and remedial activities, reflection, and attachments (worksheet, reading material, glossary). The teacher edits everything in the browser, including table cells, and exports a PDF or a Word document.
 
 ## How it works
 

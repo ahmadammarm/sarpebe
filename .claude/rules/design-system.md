@@ -20,7 +20,7 @@ Headings: Bricolage Grotesque (`font-display`, already applied to `h1` to `h3`).
 
 ## Components and structure
 
-- `<Sheet>` for a page of paper (`margin` adds the red rule); `<Notice>` for inline messages; `<Field>` and `<PasswordField>` for inputs so label, hint and error are linked; `Textarea lined` for one-item-per-line fields; `EditableTable` for tables.
+- `<Sheet>` for a page of paper (`margin` adds the red rule); `<Notice>` for inline messages; `<ConfirmDialog>` for confirming something that cannot be undone (pass a password field as its children when the action needs one); `<Pagination>` for paged lists; `<Field>` and `<PasswordField>` for inputs so label, hint and error are linked; `Textarea lined` for one-item-per-line fields; `EditableTable` for tables.
 - Link-styled buttons: `buttonVariants()` on `<Link>`; never nest a `<Button>` in a link.
 - New primitives go in `components/ui/` and take no domain props. Brand pieces go in `components/brand/`.
 - Structural devices (numbering, dividers, labels) must encode something true about the content. Do not number things that are not a sequence.

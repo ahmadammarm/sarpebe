@@ -32,7 +32,7 @@ Creating a plan returns `202` with `job_id`. Use `useJobStatus` (authenticated S
 
 ## Authentication
 
-NextAuth credentials session against `/api/auth/login`. Tokens live in the signed session cookie, never in `localStorage`; the refresh token is not exposed to browser code. `lib/authOptions.ts` renews tokens; `SessionGuard` signs out on refresh failure; `proxy.ts` protects `/lesson-plans/*` and `/curriculum/*`. Do not show protected content to unauthenticated users, even briefly.
+NextAuth credentials session against `/api/auth/login`. Tokens live in the signed session cookie, never in `localStorage`; the refresh token is not exposed to browser code. `lib/authOptions.ts` renews tokens; `SessionGuard` signs out on refresh failure; `proxy.ts` protects `/lesson-plans/*`, `/curriculum/*`, `/profile/*` and `/admin/*`. After the profile is saved, call `useSession().update({ name })` so the header shows the new name. Do not show protected content to unauthenticated users, even briefly.
 
 ## Components
 

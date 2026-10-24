@@ -10,7 +10,8 @@ Applies to ingestion, retrieval, prompts, schemas, generation, and evaluations. 
 
 ## Ingestion
 
-- Read PDFs with `app/utils/pdf_extract.py` (pdfplumber, tables as Markdown, pypdf fallback). Report pages without text in `ingest_warnings`; scans are not OCR'd.
+- Read PDFs with `app/utils/pdf_extract.py` (pdfplumber, tables as Markdown, pypdf fallback). Report pages without text in `ingest_warnings`.
+- Pages without a text layer go through OCR (`app/core/services/ocr_service.py`, prompt in `app/core/prompts/ocr.py`), capped by `OCR_MAX_PAGES`. The page image is the only data in the user turn and the rules stay in `system_instruction`; the call goes through `generate_structured` with `operation_type="ocr"`. A page that cannot be read is skipped, keeps its warning, and never fails the document unless no page yields text. OCR text is untrusted like any document text.
 - Chunk by structure with `app/utils/chunking.py`: heading path, tables as their own chunks, overlap, page range. Never cut by arbitrary character windows.
 - Embed the contextual text (`title | Fase | subject | heading` + chunk) but store the original chunk. Embeddings are 768-dimensional, L2-normalized after truncation, with `embedding_model` stored per chunk. Never mix models; changing the model or chunking means a full reindex (`scripts.reindex_documents`).
 - Labels (`grade_level`, `subject`) are normalized with `normalize_label` everywhere.

@@ -24,6 +24,7 @@ erDiagram
         varchar school_name
         varchar subscription_tier "free, premium"
         varchar role "user, admin"
+        timestamp disabled_at "null = active"
         timestamp created_at
     }
 
@@ -116,8 +117,9 @@ erDiagram
 - `email_verified_at` (TIMESTAMP, nullable): Set when the emailed link is opened (or a password is reset via email).
 - `full_name` (VARCHAR): User's displayed full name.
 - `school_name` (VARCHAR): The institution the user belongs to.
-- `subscription_tier` (VARCHAR): 'free' or 'premium'. Currently informational; no quota is enforced.
+- `subscription_tier` (VARCHAR): 'free' or 'premium'. Only `free` is limited by the generation quota (`GENERATION_DAILY_LIMIT_FREE`); admins and `premium` are not.
 - `role` (VARCHAR): `user` (default) or `admin`.
+- `disabled_at` (TIMESTAMP, nullable): Set by an administrator to block the account; NULL means active. Added by `f7a1b5c6d239`, so every existing account stays active.
 - `created_at` (TIMESTAMP): Record creation timestamp.
 
 ### 2. `curriculum_documents`
@@ -132,7 +134,7 @@ erDiagram
 - `url_path` (VARCHAR): Public URL of the PDF in Supabase Storage.
 - `uploaded_at` (TIMESTAMP): Ingestion timestamp.
 - `ingest_version` (INT, default 1): Version of the ingestion pipeline that produced the chunks. 2 = table-aware extraction + structure-aware chunking. `python -m scripts.reindex_documents` re-ingests older documents.
-- `ingest_warnings` (JSONB): Problems found while reading the PDF, e.g. pages without text (probably scanned).
+- `ingest_warnings` (JSONB): Notes from reading the PDF: pages without text, pages read with OCR, or the failure reason when `status` is `failed`.
 
 ### 3. `document_chunks` (The RAG Engine)
 **Purpose:** Stores text segments and mathematical vector representations for AI retrieval.
@@ -162,7 +164,7 @@ erDiagram
 - `generated_content` (JSONB): The full LLM structured output.
 - `status` (VARCHAR): Tracks generation ('pending', 'processing', 'completed', 'failed'). This row is the source of truth for job status.
 - `job_id` (VARCHAR, indexed): The Celery task id; used to look up a plan from `/lesson-plans/jobs/{job_id}`, scoped to its owner.
-- `created_at` (TIMESTAMP): Request timestamp.
+- `created_at` (TIMESTAMP): Request timestamp. Indexed together with `user_id` (`ix_lesson_plans_user_created`), which serves the user's list and the generation quota (plans of one user since a time, excluding failed ones).
 
 ### 5. `llm_cost_logs`
 **Purpose:** Usage analytics and token cost tracking.
@@ -196,7 +198,7 @@ erDiagram
 - `expires_at`, `used_at` (TIMESTAMP). Issuing a new token invalidates earlier unused ones of the same purpose.
 
 ### Other notes on `llm_cost_logs`
-`operation_type` is one of `generation`, `repair`, `rerank`, `embedding`, `eval`. `completion_tokens` includes thinking tokens. `lesson_plan_id` is null for embeddings made at ingestion and for evaluations, and becomes null if the plan is deleted.
+`operation_type` is one of `generation`, `repair`, `rerank`, `embedding`, `ocr`, `eval`. `completion_tokens` includes thinking tokens. `lesson_plan_id` is null for embeddings made at ingestion and for evaluations, and becomes null if the plan is deleted.
 
 ## Advanced Database Concepts
 
@@ -268,5 +270,7 @@ To ensure system stability, prevent race conditions, and maintain high performan
 | `b7e2f4a91c35` | Backend authentication: password hash, verification time, `refresh_tokens`, `auth_tokens`; import of Supabase Auth accounts. |
 | `c4d8e1f2a903` | AI pipeline metadata: plan `schema_version`, `request_options`, `prompt_version`, `model_name`, `generation_meta`; chunk `heading`, `chunk_type`, `page_end`, `embedding_model`; document `ingest_version`, `ingest_warnings`. |
 | `d5e9f3a4b017` | Retrieval indexes: generated `search_vector` with GIN, `(grade_level, subject)` btree, HNSW on `embedding`. |
+| `e6f0a4b5c128` | `lesson_plans (user_id, created_at)` index for the list and the generation quota. |
+| `f7a1b5c6d239` | `profiles.disabled_at`, so an administrator can disable an account without deleting it. |
 
 Apply with `alembic upgrade head` from `sarpebe-backend/`. After applying the last two on an existing database, run `python -m scripts.reindex_documents --all` so old chunks get headings, table chunks, normalized embeddings and the new metadata. Migration rules are in `.claude/rules/database-migrations.md`.
