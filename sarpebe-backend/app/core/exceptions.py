@@ -70,3 +70,31 @@ class InsufficientContextError(AppError):
 class InvalidContentError(AppError):
     """Raised when edited lesson plan content does not match its schema."""
     code = "invalid_content"
+
+class InvalidPasswordError(AppError):
+    """Raised when the current password given for a sensitive action is wrong."""
+    code = "invalid_password"
+
+class AccountDisabledError(AppError):
+    """Raised when an administrator has disabled the account that tries to sign in or act."""
+    code = "account_disabled"
+
+class UserNotFoundError(AppError):
+    """Raised when an administrator names a user that does not exist."""
+    code = "user_not_found"
+
+class LastAdminError(AppError):
+    """Raised when an action would leave the system without an active administrator."""
+    code = "last_admin"
+
+class SelfActionError(AppError):
+    """Raised when an administrator tries to change their own role or status, or delete themselves."""
+    code = "self_action_forbidden"
+
+class QuotaExceededError(AppError):
+    """Raised when a user has used up the lesson plans they may start in the current window."""
+    code = "quota_exceeded"
+
+class ForbiddenError(AppError):
+    """Raised when an authenticated user lacks the role an endpoint requires."""
+    code = "forbidden"

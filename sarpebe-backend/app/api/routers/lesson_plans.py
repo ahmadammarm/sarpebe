@@ -10,13 +10,15 @@ from app.db.models.profile import Profile
 
 router = APIRouter(prefix="/lesson-plans", tags=["Lesson Plans"])
 
+DOCX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
 @router.post("", status_code=status.HTTP_202_ACCEPTED)
 async def create_lesson_plan(
     payload: LessonPlanCreate,
     db: AsyncSession = Depends(get_db),
     current_user: Profile = Depends(get_current_user)
 ):
-    job_id, plan_id = await lesson_plan_service.trigger_generation(db, current_user.id, payload)
+    job_id, plan_id = await lesson_plan_service.trigger_generation(db, current_user, payload)
     return {"job_id": job_id, "id": str(plan_id)}
 
 @router.get("", response_model=PaginatedResponse[LessonPlanResponse])
@@ -99,5 +101,18 @@ async def export_lesson_plan_pdf(
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+@router.get("/{id}/export/docx")
+async def export_lesson_plan_docx(
+    id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: Profile = Depends(get_current_user)
+):
+    docx_bytes, filename = await lesson_plan_service.export_docx(db, id, current_user.id)
+    return Response(
+        content=docx_bytes,
+        media_type=DOCX_MEDIA_TYPE,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )

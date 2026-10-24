@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.core import rate_limit
 from app.core.exceptions import (
+    AccountDisabledError,
     EmailNotVerifiedError,
     InvalidCredentialsError,
     InvalidEmailTokenError,
@@ -177,7 +178,9 @@ class AuthService:
             await rate_limit.increment(failure_key, settings.login_lockout_minutes * 60)
             raise InvalidCredentialsError("Invalid email or password.")
 
-        # Only reveal verification status to someone who proved they know the password.
+        # Account status is only revealed to someone who proved they know the password.
+        if user.disabled_at is not None:
+            raise AccountDisabledError("This account has been disabled.")
         if settings.require_email_verification and user.email_verified_at is None:
             raise EmailNotVerifiedError("Email address has not been verified.")
 
@@ -215,6 +218,11 @@ class AuthService:
         user = await user_repo.get(db, token.user_id)
         if not user:
             raise InvalidRefreshTokenError("Invalid refresh token.")
+        if user.disabled_at is not None:
+            # A session that outlived the account being disabled must not renew itself.
+            await refresh_token_repo.revoke_family(db, token.family_id, now)
+            await db.commit()
+            raise AccountDisabledError("This account has been disabled.")
 
         tokens = await AuthService._issue_tokens(db, user, family_id=token.family_id)
         await db.commit()

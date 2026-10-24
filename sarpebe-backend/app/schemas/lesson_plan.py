@@ -58,3 +58,5 @@ class JobStatusResponse(BaseModel):
     stage: str | None = None
     lesson_plan_id: UUID | None = None
     error: str | None = None
+    # Stable identifier of the failure ("insufficient_context", "internal_error", "timeout", ...).
+    error_code: str | None = None

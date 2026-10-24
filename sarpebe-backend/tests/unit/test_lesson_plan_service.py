@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.config import settings
-from app.core.exceptions import InvalidContentError, InvalidStateError
+from app.core.exceptions import InvalidContentError, InvalidStateError, QuotaExceededError
 from app.core.services import lesson_plan_service as service_module
 from app.core.services.lesson_plan_service import lesson_plan_service
 from app.db.models.lesson_plan import LessonPlan
@@ -59,6 +59,7 @@ async def test_generation_is_dispatched_only_after_commit(mocker):
 
     plan = MagicMock(id=uuid.uuid4())
     mocker.patch.object(service_module.lesson_plan_repo, "create", new_callable=AsyncMock, return_value=plan)
+    mocker.patch.object(service_module.quota_service, "ensure_available", new_callable=AsyncMock)
     apply_async = mocker.patch(
         "app.tasks.generation_tasks.generate_lesson_plan_task.apply_async",
         side_effect=lambda *a, **k: order.append("dispatch"),
@@ -66,7 +67,7 @@ async def test_generation_is_dispatched_only_after_commit(mocker):
 
     user_id = uuid.uuid4()
     job_id, plan_id = await lesson_plan_service.trigger_generation(
-        db, user_id, LessonPlanCreate(grade_level="9", subject="Biologi", topic="Sel")
+        db, MagicMock(id=user_id), LessonPlanCreate(grade_level="9", subject="Biologi", topic="Sel")
     )
 
     assert order == ["commit", "dispatch"]
@@ -81,10 +82,11 @@ async def test_generation_is_dispatched_only_after_commit(mocker):
 async def test_the_teachers_options_and_the_prompt_version_are_stored_on_the_plan(mocker):
     db = AsyncMock()
     mocker.patch.object(service_module.lesson_plan_repo, "create", new_callable=AsyncMock, return_value=MagicMock(id=uuid.uuid4()))
+    mocker.patch.object(service_module.quota_service, "ensure_available", new_callable=AsyncMock)
     mocker.patch("app.tasks.generation_tasks.generate_lesson_plan_task.apply_async")
 
     await lesson_plan_service.trigger_generation(
-        db, uuid.uuid4(),
+        db, MagicMock(id=uuid.uuid4()),
         LessonPlanCreate(
             grade_level="9", subject="IPS", topic="Ekonomi", meeting_count=3, minutes_per_meeting=90,
             teaching_model=TeachingModel.PJBL, class_notes="kelas aktif",
@@ -97,6 +99,25 @@ async def test_the_teachers_options_and_the_prompt_version_are_stored_on_the_pla
     }
     assert created["prompt_version"] == settings.prompt_version
     assert created["model_name"] == settings.gemini_generation_model
+
+
+async def test_a_user_over_the_quota_creates_no_plan_and_starts_no_job(mocker):
+    db = AsyncMock()
+    create = mocker.patch.object(service_module.lesson_plan_repo, "create", new_callable=AsyncMock)
+    mocker.patch.object(
+        service_module.quota_service, "ensure_available", new_callable=AsyncMock,
+        side_effect=QuotaExceededError("limit"),
+    )
+    apply_async = mocker.patch("app.tasks.generation_tasks.generate_lesson_plan_task.apply_async")
+
+    with pytest.raises(QuotaExceededError):
+        await lesson_plan_service.trigger_generation(
+            db, MagicMock(id=uuid.uuid4()), LessonPlanCreate(grade_level="9", subject="IPS", topic="Ekonomi")
+        )
+
+    create.assert_not_awaited()
+    db.commit.assert_not_awaited()
+    apply_async.assert_not_called()
 
 
 # --- editing -------------------------------------------------------------------------------------------------------
@@ -158,6 +179,16 @@ async def test_a_new_module_is_exported_with_the_module_renderer(repo, mocker):
     old_pdf.assert_not_called()
 
 
+async def test_the_export_name_is_safe_for_a_header_whatever_the_topic(repo, mocker):
+    repo.topic = 'Ekosistem "Laut"; Sumatra/Jawa\r\nSet-Cookie: x=1'
+    mocker.patch.object(service_module, "generate_modul_pdf", return_value=b"%PDF-modul")
+
+    _, filename = await lesson_plan_service.export_pdf(AsyncMock(), repo.id, USER_ID)
+
+    assert filename.endswith(".pdf")
+    assert not set(filename) & set('"/\\;:\r\n ')
+
+
 async def test_an_old_plan_is_still_exported_with_the_original_renderer(repo, mocker):
     repo.schema_version = 1
     repo.generated_content = {"title": "Lama"}
@@ -175,6 +206,40 @@ async def test_export_needs_a_completed_plan(repo):
     repo.status = "failed"
     with pytest.raises(InvalidStateError):
         await lesson_plan_service.export_pdf(AsyncMock(), repo.id, USER_ID)
+    with pytest.raises(InvalidStateError):
+        await lesson_plan_service.export_docx(AsyncMock(), repo.id, USER_ID)
+
+
+async def test_a_new_module_is_exported_to_word_with_a_safe_name(repo, mocker):
+    repo.topic = 'Ekonomi "Laut"/Jawa'
+    docx = mocker.patch.object(service_module, "generate_modul_docx", return_value=b"PK-modul")
+
+    data, filename = await lesson_plan_service.export_docx(AsyncMock(), repo.id, USER_ID)
+
+    assert data == b"PK-modul" and filename == "Modul_Ajar_Ekonomi_Laut_Jawa.docx"
+    assert isinstance(docx.call_args.args[0], ModulContent)
+
+
+async def test_an_old_plan_has_no_word_export(repo, mocker):
+    repo.schema_version = 1
+    repo.generated_content = {"title": "Lama"}
+    docx = mocker.patch.object(service_module, "generate_modul_docx")
+
+    with pytest.raises(InvalidStateError, match="current format"):
+        await lesson_plan_service.export_docx(AsyncMock(), repo.id, USER_ID)
+
+    docx.assert_not_called()
+
+
+async def test_exports_are_rendered_off_the_event_loop(repo, mocker):
+    to_thread = mocker.patch.object(service_module.asyncio, "to_thread", new_callable=AsyncMock, return_value=b"x")
+
+    await lesson_plan_service.export_pdf(AsyncMock(), repo.id, USER_ID)
+    await lesson_plan_service.export_docx(AsyncMock(), repo.id, USER_ID)
+
+    assert [call.args[0] for call in to_thread.await_args_list] == [
+        service_module.generate_modul_pdf, service_module.generate_modul_docx,
+    ]
 
 
 # --- job status ------------------------------------------------------------------------------------------------------
@@ -205,12 +270,27 @@ async def test_a_stuck_job_is_reported_failed_without_a_stage(mocker):
     job = await lesson_plan_service.get_job_status(AsyncMock(), "job-1", USER_ID)
 
     assert job.status == "failed" and job.stage is None and "batas waktu" in job.error
+    assert job.error_code == "timeout"
 
 
-async def test_a_failed_job_reports_its_error(mocker):
-    plan = make_plan(status="failed", generated_content={"error": "Dokumen belum cukup."}, schema_version=1)
+async def test_a_failed_job_reports_its_error_and_code(mocker):
+    plan = make_plan(
+        status="failed",
+        generated_content={"error": "Dokumen belum cukup.", "code": "insufficient_context"},
+        schema_version=1,
+    )
     mocker.patch.object(service_module.lesson_plan_repo, "get_by_job_id_and_user", new_callable=AsyncMock, return_value=plan)
 
     job = await lesson_plan_service.get_job_status(AsyncMock(), "job-1", USER_ID)
 
     assert job.status == "failed" and job.error == "Dokumen belum cukup."
+    assert job.error_code == "insufficient_context"
+
+
+async def test_a_failed_job_saved_before_error_codes_existed_has_no_code(mocker):
+    plan = make_plan(status="failed", generated_content={"error": "Dokumen belum cukup."}, schema_version=1)
+    mocker.patch.object(service_module.lesson_plan_repo, "get_by_job_id_and_user", new_callable=AsyncMock, return_value=plan)
+
+    job = await lesson_plan_service.get_job_status(AsyncMock(), "job-1", USER_ID)
+
+    assert job.error == "Dokumen belum cukup." and job.error_code is None

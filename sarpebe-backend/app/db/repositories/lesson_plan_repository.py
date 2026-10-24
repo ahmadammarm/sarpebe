@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Sequence
 from uuid import UUID
 from sqlalchemy import select, func
@@ -33,6 +34,23 @@ class LessonPlanRepository(BaseRepository[LessonPlan, LessonPlanCreate, dict]):
         )
         items = result.scalars().all()
         return items, total
+
+    async def usage_since(
+        self, db: AsyncSession, user_id: UUID | str, since: datetime
+    ) -> tuple[int, datetime | None]:
+        """
+        How many plans the user started since `since`, and when the oldest of them was created.
+        Failed plans are not counted: a failure is not something the user got to keep.
+        """
+        result = await db.execute(
+            select(func.count(), func.min(self.model.created_at)).filter(
+                self.model.user_id == user_id,
+                self.model.created_at >= since,
+                self.model.status != "failed",
+            )
+        )
+        count, oldest = result.one()
+        return count, oldest
 
     async def get_by_id_and_user(self, db: AsyncSession, id: UUID | str, user_id: UUID | str) -> LessonPlan | None:
         """

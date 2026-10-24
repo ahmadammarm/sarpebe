@@ -5,6 +5,7 @@ from celery.utils.log import get_task_logger
 
 from app.config import settings
 from app.core.exceptions import (
+    AppError,
     ContentBlockedError,
     InsufficientContextError,
     LLMOutputError,
@@ -44,13 +45,38 @@ def _request_from_plan(plan: LessonPlan) -> ModulRequest:
     )
 
 
-async def _fail(session_factory, plan_id: str, message: str, meta: dict[str, Any] | None = None) -> None:
+INTERNAL_ERROR_MESSAGE = "Modul belum berhasil disusun karena gangguan sistem. Coba lagi."
+
+# What the teacher reads when a permanent error stops a plan. The exception's own text is English
+# developer text and may carry details, so only InsufficientContextError (already Indonesian,
+# written for the teacher) passes its message through.
+FAILURE_MESSAGES: dict[type[Exception], str] = {
+    LLMOutputError: "Model belum menghasilkan modul yang valid. Coba buat ulang.",
+    ContentBlockedError: "Model tidak dapat menyusun modul untuk topik ini. Ubah topiknya lalu coba lagi.",
+    TransientLLMError: "Layanan penyusun modul sedang tidak tersedia. Coba lagi beberapa saat lagi.",
+}
+
+
+def _failure_for(error: AppError) -> tuple[str, str]:
+    """(teacher-facing message, stable code) for an error that repeating cannot fix."""
+    if isinstance(error, InsufficientContextError):
+        return error.message, error.code
+    return FAILURE_MESSAGES.get(type(error), INTERNAL_ERROR_MESSAGE), error.code
+
+
+async def _fail(
+    session_factory,
+    plan_id: str,
+    message: str,
+    code: str,
+    meta: dict[str, Any] | None = None,
+) -> None:
     """Marks the plan failed in a fresh session, so an aborted transaction cannot get in the way."""
     async with session_factory() as db:
         plan = await lesson_plan_repo.get(db, plan_id)
         if plan:
             plan.status = "failed"
-            plan.generated_content = {"error": message}
+            plan.generated_content = {"error": message, "code": code}
             plan.generation_meta = {**(meta or {}), "failed": True}
             await db.commit()
 
@@ -114,13 +140,14 @@ async def _run_generation(lesson_plan_id: str, user_id: str, is_final_attempt: b
 
         except PERMANENT_ERRORS as e:
             logger.warning(f"[{lesson_plan_id}] Generation stopped: {e.message}")
-            await _fail(session_factory, lesson_plan_id, e.message)
+            message, code = _failure_for(e)
+            await _fail(session_factory, lesson_plan_id, message, code)
 
         except Exception as e:
             logger.exception(f"[{lesson_plan_id}] Error during generation: {str(e)}")
             if not is_final_attempt:
                 raise
-            await _fail(session_factory, lesson_plan_id, f"Task crashed: {str(e)}")
+            await _fail(session_factory, lesson_plan_id, INTERNAL_ERROR_MESSAGE, "internal_error")
 
 
 @celery_app.task(

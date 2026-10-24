@@ -139,7 +139,7 @@ def generate_modul_pdf(content: ModulContent) -> bytes:
     pdf.set_font(FONT_FAMILY, "B", 11)
     pdf.cell(pdf.epw, 7, "MODUL AJAR KURIKULUM MERDEKA", align="C", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(2)
-    _write_title(pdf, content.title or identity.topic)
+    _write_title(pdf, content.title.strip() or identity.topic)
 
     pdf.set_font(FONT_FAMILY, "", 10)
     with pdf.table(

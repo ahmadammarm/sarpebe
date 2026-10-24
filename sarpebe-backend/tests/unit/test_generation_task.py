@@ -157,23 +157,37 @@ async def test_nothing_relevant_in_the_documents_fails_without_calling_the_model
 
     pipeline.generate.assert_not_awaited()
     assert plan.status == "failed"
-    assert plan.generated_content == {"error": "Dokumen kurikulum yang tersedia belum membahas topik ini."}
+    assert plan.generated_content == {
+        "error": "Dokumen kurikulum yang tersedia belum membahas topik ini.",
+        "code": "insufficient_context",
+    }
 
 
-@pytest.mark.parametrize("error", [
-    InsufficientContextError("Sumber tidak memuat topik ini."),
-    LLMOutputError("Model belum menghasilkan modul yang valid."),
-    ContentBlockedError("Permintaan ditolak oleh filter keamanan model."),
-    TransientLLMError("Layanan model sedang sibuk."),
-])
 @async_test
-async def test_model_side_failures_mark_the_plan_failed_with_their_message_and_are_not_retried(pipeline, plan, error):
-    pipeline.generate.side_effect = error
+async def test_insufficient_context_keeps_its_own_message_and_is_not_retried(pipeline, plan):
+    pipeline.generate.side_effect = InsufficientContextError("Sumber tidak memuat topik ini.")
 
     await run(plan, final=False)
 
     assert plan.status == "failed"
-    assert plan.generated_content == {"error": error.message}
+    assert plan.generated_content == {"error": "Sumber tidak memuat topik ini.", "code": "insufficient_context"}
+    assert plan.generation_meta == {"failed": True}
+
+
+@pytest.mark.parametrize("error,code", [
+    (LLMOutputError("raw model output: {...}"), "llm_output_invalid"),
+    (ContentBlockedError("finish_reason=SAFETY"), "content_blocked"),
+    (TransientLLMError("503 Service Unavailable from upstream"), "llm_unavailable"),
+])
+@async_test
+async def test_other_model_failures_show_a_fixed_indonesian_message_not_the_exception_text(pipeline, plan, error, code):
+    pipeline.generate.side_effect = error
+
+    await run(plan, final=False)  # not retried: must not raise
+
+    assert plan.status == "failed"
+    assert plan.generated_content == {"error": generation_tasks.FAILURE_MESSAGES[type(error)], "code": code}
+    assert error.message not in plan.generated_content["error"]
     assert plan.generation_meta == {"failed": True}
 
 
@@ -196,7 +210,8 @@ async def test_an_unexpected_error_on_the_last_attempt_marks_the_plan_failed(pip
     await run(plan, final=True)
 
     assert plan.status == "failed"
-    assert "Task crashed" in plan.generated_content["error"] and "database connection reset" in plan.generated_content["error"]
+    assert plan.generated_content == {"error": generation_tasks.INTERNAL_ERROR_MESSAGE, "code": "internal_error"}
+    assert "database connection reset" not in str(plan.generated_content)
 
 
 def test_celery_retries_infrastructure_faults_once():

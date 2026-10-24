@@ -1,8 +1,9 @@
 import uuid
-from fastapi import APIRouter, Depends, UploadFile, File, Form, status
+from fastapi import APIRouter, Depends, Query, UploadFile, File, Form, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_db, require_admin
-from app.schemas.curriculum import CurriculumDocumentResponse, DocumentType
+from app.schemas.common import PaginatedResponse
+from app.schemas.curriculum import CurriculumDocumentResponse, CurriculumDocumentUpdate, DocumentType
 from app.db.models.profile import Profile
 from app.core.services.curriculum_service import curriculum_service
 
@@ -28,12 +29,33 @@ async def upload_document(
         admin_id=current_admin.id,
     )
 
-@router.get("", response_model=list[CurriculumDocumentResponse])
+@router.get("", response_model=PaginatedResponse[CurriculumDocumentResponse])
 async def list_documents(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     current_admin: Profile = Depends(require_admin)
 ):
-    return list(await curriculum_service.list_documents(db))
+    items, total = await curriculum_service.list_documents(db, skip, limit)
+    return PaginatedResponse(items=list(items), total=total, skip=skip, limit=limit)
+
+@router.patch("/{id}", response_model=CurriculumDocumentResponse)
+async def update_document(
+    id: uuid.UUID,
+    payload: CurriculumDocumentUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_admin: Profile = Depends(require_admin)
+):
+    """Edits title, type, grade or subject. A new grade or subject processes the document again."""
+    return await curriculum_service.update(db, id, payload, current_admin.id)
+
+@router.post("/{id}/reindex", response_model=CurriculumDocumentResponse, status_code=status.HTTP_202_ACCEPTED)
+async def reindex_document(
+    id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_admin: Profile = Depends(require_admin)
+):
+    return await curriculum_service.reindex(db, id, current_admin.id)
 
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_document(

@@ -1,6 +1,20 @@
 import re
+import unicodedata
 
 _WORD = re.compile(r"[^\W_]{3,}")
+_FILENAME_UNSAFE = re.compile(r"[^A-Za-z0-9._-]+")
+FILENAME_MAX_STEM = 80
+
+
+def safe_filename(stem: str, extension: str, fallback: str = "Modul_Ajar") -> str:
+    """
+    A download name that is safe inside a Content-Disposition header: ASCII letters, digits,
+    dot, dash and underscore only, at most FILENAME_MAX_STEM characters before the extension.
+    Accents are folded to their base letter; anything else collapses to an underscore.
+    """
+    folded = unicodedata.normalize("NFKD", stem).encode("ascii", "ignore").decode("ascii")
+    cleaned = _FILENAME_UNSAFE.sub("_", folded).strip("._-")[:FILENAME_MAX_STEM].strip("._-")
+    return f"{cleaned or fallback}.{extension.lstrip('.')}"
 
 
 def keyword_terms(text: str, limit: int = 12) -> list[str]:

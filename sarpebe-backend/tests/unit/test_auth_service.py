@@ -8,6 +8,7 @@ from sqlalchemy import select
 from app.config import settings
 from app.core import rate_limit, security
 from app.core.exceptions import (
+    AccountDisabledError,
     EmailNotVerifiedError,
     InvalidCredentialsError,
     InvalidEmailTokenError,
@@ -201,6 +202,28 @@ async def test_successful_login_clears_failure_counter(db, fake_rate_limit):
     assert not fake_rate_limit
 
 
+async def test_a_disabled_account_cannot_log_in_but_only_a_correct_password_learns_why(db):
+    user = await make_user(db)
+    user.disabled_at = utc_now()
+    await db.commit()
+
+    with pytest.raises(AccountDisabledError):
+        await auth_service.login(db, "guru@example.com", PASSWORD)
+    # A wrong password must not reveal that the account is disabled.
+    with pytest.raises(InvalidCredentialsError):
+        await auth_service.login(db, "guru@example.com", "wrong-password")
+    assert await all_rows(db, RefreshToken) == []  # no session was opened
+
+
+async def test_a_disabled_account_is_reported_before_an_unverified_email(db):
+    user = await make_user(db, verified=False)
+    user.disabled_at = utc_now()
+    await db.commit()
+
+    with pytest.raises(AccountDisabledError):
+        await auth_service.login(db, "guru@example.com", PASSWORD)
+
+
 async def test_imported_supabase_account_can_log_in(db):
     legacy_hash = bcrypt.hashpw(b"old-supabase-pw", bcrypt.gensalt(rounds=4)).decode().replace("$2b$", "$2a$", 1)
     await make_user(db, password_hash=legacy_hash)
@@ -228,6 +251,20 @@ async def test_refresh_rotates_tokens(db):
     assert old.revoked_at is not None and old.rotated
     assert new.revoked_at is None
     assert old.family_id == new.family_id
+
+
+async def test_a_session_of_an_account_disabled_afterwards_cannot_renew_itself(db):
+    user = await make_user(db)
+    tokens = await auth_service.login(db, "guru@example.com", PASSWORD)
+    user.disabled_at = utc_now()
+    await db.commit()
+
+    with pytest.raises(AccountDisabledError):
+        await auth_service.refresh(db, tokens.refresh_token)
+
+    row = (await all_rows(db, RefreshToken))[0]
+    await db.refresh(row)
+    assert row.revoked_at is not None  # the whole login session is closed
 
 
 async def test_refresh_rejects_unknown_and_expired_tokens(db):

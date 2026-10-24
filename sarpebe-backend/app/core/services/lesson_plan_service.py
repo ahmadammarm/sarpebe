@@ -7,13 +7,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core.exceptions import InvalidContentError, InvalidStateError, LessonPlanNotFoundError
+from app.core.services.quota_service import quota_service
 from app.db.models.lesson_plan import LessonPlan
+from app.db.models.profile import Profile
 from app.db.repositories.lesson_plan_repository import lesson_plan_repo
 from app.db.session import AsyncSessionLocal
 from app.schemas.lesson_plan import JobStatusResponse, LessonPlanCreate
 from app.schemas.lesson_plan_content import SCHEMA_VERSION, ModulContent
+from app.utils.modul_docx import generate_modul_docx
 from app.utils.modul_pdf import generate_modul_pdf
 from app.utils.pdf_generator import generate_lesson_plan_pdf
+from app.utils.text import safe_filename
 from app.utils.time import utc_now
 
 TERMINAL_STATUSES = {"completed", "failed"}
@@ -22,10 +26,13 @@ STREAM_POLL_SECONDS = 1
 
 class LessonPlanService:
     @staticmethod
-    async def trigger_generation(db: AsyncSession, user_id: uuid.UUID, payload: LessonPlanCreate) -> tuple[str, uuid.UUID]:
+    async def trigger_generation(db: AsyncSession, user: Profile, payload: LessonPlanCreate) -> tuple[str, uuid.UUID]:
         """
         Creates a pending plan and dispatches generation to Celery.
+        Raises QuotaExceededError if the user has no plans left in the current window.
         """
+        user_id = user.id
+        await quota_service.ensure_available(db, user)
         job_id = str(uuid.uuid4())
         plan = await lesson_plan_repo.create(db, {
             "user_id": user_id,
@@ -89,15 +96,22 @@ class LessonPlanService:
         await db.commit()
 
     @staticmethod
-    async def export_pdf(db: AsyncSession, plan_id: uuid.UUID, user_id: uuid.UUID) -> tuple[bytes, str]:
+    async def _get_exportable(db: AsyncSession, plan_id: uuid.UUID, user_id: uuid.UUID) -> LessonPlan:
         plan = await LessonPlanService.get_plan(db, plan_id, user_id)
         if plan.status != "completed" or not plan.generated_content:
             raise InvalidStateError("Lesson plan is not completed yet or has no content to export.")
+        return plan
 
+    @staticmethod
+    async def export_pdf(db: AsyncSession, plan_id: uuid.UUID, user_id: uuid.UUID) -> tuple[bytes, str]:
+        plan = await LessonPlanService._get_exportable(db, plan_id, user_id)
+
+        # Rendering is CPU-bound, so it runs in a thread instead of blocking the event loop.
         if plan.schema_version == SCHEMA_VERSION:
-            pdf_bytes = generate_modul_pdf(ModulContent.model_validate(plan.generated_content))
+            pdf_bytes = await asyncio.to_thread(generate_modul_pdf, ModulContent.model_validate(plan.generated_content))
         else:
-            pdf_bytes = generate_lesson_plan_pdf(
+            pdf_bytes = await asyncio.to_thread(
+                generate_lesson_plan_pdf,
                 plan_metadata={
                     "grade_level": plan.grade_level,
                     "subject": plan.subject,
@@ -105,8 +119,17 @@ class LessonPlanService:
                 },
                 content=plan.generated_content,
             )
-        filename = f"Modul_Ajar_{plan.topic.replace(' ', '_')}.pdf"
-        return pdf_bytes, filename
+        return pdf_bytes, safe_filename(f"Modul_Ajar_{plan.topic}", "pdf")
+
+    @staticmethod
+    async def export_docx(db: AsyncSession, plan_id: uuid.UUID, user_id: uuid.UUID) -> tuple[bytes, str]:
+        """Word export. Only full modules (schema version 2) have it; older plans stay PDF-only."""
+        plan = await LessonPlanService._get_exportable(db, plan_id, user_id)
+        if plan.schema_version != SCHEMA_VERSION:
+            raise InvalidStateError("Word export is only available for modules in the current format.")
+
+        docx_bytes = await asyncio.to_thread(generate_modul_docx, ModulContent.model_validate(plan.generated_content))
+        return docx_bytes, safe_filename(f"Modul_Ajar_{plan.topic}", "docx")
 
     @staticmethod
     async def get_job_status(db: AsyncSession, job_id: str, user_id: uuid.UUID) -> JobStatusResponse:
@@ -121,15 +144,25 @@ class LessonPlanService:
         status = plan.status
         stage = None
         error = None
+        error_code = None
         if status == "failed" and plan.generated_content:
             error = plan.generated_content.get("error")
+            error_code = plan.generated_content.get("code")
         elif status not in TERMINAL_STATUSES and utc_now() - plan.created_at > STALE_AFTER:
             status = "failed"
             error = "Pembuatan modul ajar melebihi batas waktu."
+            error_code = "timeout"
         elif status == "processing" and plan.generation_meta:
             stage = plan.generation_meta.get("stage")
 
-        return JobStatusResponse(job_id=job_id, status=status, stage=stage, lesson_plan_id=plan.id, error=error)
+        return JobStatusResponse(
+            job_id=job_id,
+            status=status,
+            stage=stage,
+            lesson_plan_id=plan.id,
+            error=error,
+            error_code=error_code,
+        )
 
     @staticmethod
     async def stream_job_status(job_id: str, user_id: uuid.UUID) -> AsyncIterator[JobStatusResponse]:

@@ -5,19 +5,26 @@ from fastapi.responses import JSONResponse
 from app.api.router import api_router
 from app.config import settings
 from app.core.exceptions import (
+    AccountDisabledError,
     AppError,
     DocumentNotFoundError,
     EmailNotVerifiedError,
+    ForbiddenError,
     InvalidAccessTokenError,
     InvalidContentError,
     InvalidCredentialsError,
     InvalidEmailTokenError,
+    InvalidPasswordError,
     InvalidRefreshTokenError,
     InvalidStateError,
     InvalidUploadError,
+    LastAdminError,
     LessonPlanNotFoundError,
     NotOwnerError,
+    QuotaExceededError,
+    SelfActionError,
     TooManyAttemptsError,
+    UserNotFoundError,
 )
 from app.db.session import engine
 
@@ -48,6 +55,7 @@ ERROR_STATUS_CODES: dict[type[AppError], int] = {
     DocumentNotFoundError: 404,
     LessonPlanNotFoundError: 404,
     NotOwnerError: 403,
+    ForbiddenError: 403,
     InvalidStateError: 409,
     InvalidUploadError: 400,
     InvalidEmailTokenError: 400,
@@ -57,6 +65,12 @@ ERROR_STATUS_CODES: dict[type[AppError], int] = {
     InvalidRefreshTokenError: 401,
     EmailNotVerifiedError: 403,
     TooManyAttemptsError: 429,
+    QuotaExceededError: 429,
+    InvalidPasswordError: 400,  # not 401: the client would take that for an expired session
+    AccountDisabledError: 403,
+    UserNotFoundError: 404,
+    LastAdminError: 409,
+    SelfActionError: 409,
 }
 
 
