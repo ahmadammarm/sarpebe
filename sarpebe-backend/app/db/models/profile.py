@@ -19,6 +19,8 @@ class Profile(Base):
     school_name: Mapped[str | None] = mapped_column(String, nullable=True)
     subscription_tier: Mapped[str] = mapped_column(String, default="free")
     role: Mapped[str] = mapped_column(String, default="user", nullable=False)
+    # Set by an admin to block the account without deleting it; None means active.
+    disabled_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=utc_now)
 
     # Relationships

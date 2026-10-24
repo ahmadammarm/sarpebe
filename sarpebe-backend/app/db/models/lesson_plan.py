@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Integer, String, TIMESTAMP, ForeignKey, text
+from sqlalchemy import Index, Integer, String, TIMESTAMP, ForeignKey, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from app.db.base import Base
@@ -8,6 +8,8 @@ from app.utils.time import utc_now
 
 class LessonPlan(Base):
     __tablename__ = "lesson_plans"
+    # Serves the per-user list and the generation quota ("plans of this user since ...").
+    __table_args__ = (Index("ix_lesson_plans_user_created", "user_id", "created_at"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False)
